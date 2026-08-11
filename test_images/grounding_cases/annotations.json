@@ -1,0 +1,202 @@
+[
+  {
+    "image": "clear_three_boxes.png",
+    "description": "粉色的长方体包装盒",
+    "bbox": [
+      80,
+      340,
+      230,
+      455
+    ]
+  },
+  {
+    "image": "clear_three_boxes.png",
+    "description": "黄色的长方体包装盒",
+    "bbox": [
+      365,
+      350,
+      520,
+      465
+    ]
+  },
+  {
+    "image": "clear_three_boxes.png",
+    "description": "棕色的长方体包装盒",
+    "bbox": [
+      650,
+      335,
+      810,
+      455
+    ]
+  },
+  {
+    "image": "clear_three_boxes.png",
+    "description": "圆形工具桶",
+    "bbox": [
+      790,
+      305,
+      910,
+      485
+    ]
+  },
+  {
+    "image": "target_at_edge.png",
+    "description": "粉色的长方体包装盒",
+    "bbox": [
+      8,
+      350,
+      125,
+      445
+    ]
+  },
+  {
+    "image": "target_at_edge.png",
+    "description": "黄色的长方体包装盒",
+    "bbox": [
+      430,
+      345,
+      590,
+      465
+    ]
+  },
+  {
+    "image": "target_at_edge.png",
+    "description": "棕色的长方体包装盒",
+    "bbox": [
+      690,
+      350,
+      845,
+      465
+    ]
+  },
+  {
+    "image": "target_at_edge.png",
+    "description": "圆形工具桶",
+    "bbox": [
+      230,
+      315,
+      355,
+      490
+    ]
+  },
+  {
+    "image": "small_distant_target.png",
+    "description": "粉色的长方体包装盒",
+    "bbox": [
+      420,
+      245,
+      485,
+      295
+    ]
+  },
+  {
+    "image": "small_distant_target.png",
+    "description": "黄色的长方体包装盒",
+    "bbox": [
+      170,
+      355,
+      330,
+      470
+    ]
+  },
+  {
+    "image": "small_distant_target.png",
+    "description": "棕色的长方体包装盒",
+    "bbox": [
+      620,
+      345,
+      785,
+      470
+    ]
+  },
+  {
+    "image": "small_distant_target.png",
+    "description": "圆形工具桶",
+    "bbox": [
+      805,
+      320,
+      915,
+      485
+    ]
+  },
+  {
+    "image": "similar_distractors.png",
+    "description": "粉色的长方体包装盒",
+    "bbox": [
+      110,
+      350,
+      255,
+      465
+    ]
+  },
+  {
+    "image": "similar_distractors.png",
+    "description": "粉色的长方体包装盒",
+    "bbox": [
+      385,
+      335,
+      535,
+      460
+    ]
+  },
+  {
+    "image": "similar_distractors.png",
+    "description": "黄色的长方体包装盒",
+    "bbox": [
+      665,
+      350,
+      825,
+      465
+    ]
+  },
+  {
+    "image": "similar_distractors.png",
+    "description": "圆形工具桶",
+    "bbox": [
+      15,
+      315,
+      100,
+      485
+    ]
+  },
+  {
+    "image": "partial_occlusion.png",
+    "description": "粉色的长方体包装盒",
+    "bbox": [
+      190,
+      340,
+      360,
+      465
+    ]
+  },
+  {
+    "image": "partial_occlusion.png",
+    "description": "黄色的长方体包装盒",
+    "bbox": [
+      520,
+      345,
+      680,
+      465
+    ]
+  },
+  {
+    "image": "partial_occlusion.png",
+    "description": "棕色的长方体包装盒",
+    "bbox": [
+      735,
+      350,
+      880,
+      465
+    ]
+  },
+  {
+    "image": "partial_occlusion.png",
+    "description": "圆形工具桶",
+    "bbox": [
+      330,
+      310,
+      470,
+      490
+    ]
+  }
+]

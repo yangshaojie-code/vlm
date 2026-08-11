@@ -1,0 +1,7 @@
+This file is a historical container preflight captured before the official
+MMK2Kdl backend and dynamic camera extrinsics were integrated. Its old
+MockIK/discoverse failure is no longer a valid current-status signal.
+
+Current host regression: `python -m unittest discover -v` -> 43 tests, OK.
+The container `formal_client.py --preflight-only` still requires a running
+Server and must be rerun in the official Client image before motion testing.

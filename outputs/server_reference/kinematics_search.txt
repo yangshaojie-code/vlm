@@ -1,0 +1,43 @@
+/workspace/material_sorting_task/discoverse/robots/mmk2/mmk2_fk.py:63:    def forward_kinematics(self):
+/workspace/material_sorting_task/discoverse/robots/mmk2/mmk2_fk.py:75:            self.forward_kinematics()
+/workspace/material_sorting_task/discoverse/robots/mmk2/mmk2_fk.py:89:            self.forward_kinematics()
+/workspace/material_sorting_task/discoverse/robots/mmk2/mmk2_fk.py:103:            self.forward_kinematics()
+/workspace/material_sorting_task/discoverse/robots/mmk2/mmk2_fk.py:117:            self.forward_kinematics()
+/workspace/material_sorting_task/discoverse/robots/mmk2/mmk2_fk.py:131:            self.forward_kinematics()
+/workspace/material_sorting_task/examples/material_sorting/material_sorting_client_base.py:211:        sols = self.kdl.inverse_kinematics(T_left=None, T_right=T, ref_pos=ref, target_height=float(self.tc[2]))
+/workspace/material_sorting_task/examples/material_sorting/material_sorting_client_base.py:220:        _, T = self.kdl.forward_kinematics(np.concatenate([[float(self.slide_meas)], self.rarm_meas]), index="right")
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:65:    def forward_kinematics(
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:69:        Get the forward kinematics of mmk2
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:89:            T_left_arm = self.left_arm.forward_kinematics(q[1:7])
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:90:            T_right_arm = self.right_arm.forward_kinematics(q[7:13])
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:97:            T_left_arm = self.left_arm.forward_kinematics(q[1:7])
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:102:            T_right_arm = self.right_arm.forward_kinematics(q[1:7])
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:106:    def _inverse_kinematics(
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:113:        """Get the inverse kinematics of mmk2"""
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:146:            left_arm_joints = self.left_arm.inverse_kinematics(
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:149:            right_arm_joints = self.right_arm.inverse_kinematics(
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:183:            arm_joints = self.left_arm.inverse_kinematics(T_arm, ref_arm_pos)
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:208:            arm_joints = self.right_arm.inverse_kinematics(T_arm, ref_arm_pos)
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:228:    def inverse_kinematics(
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:236:        Get the inverse kinematics of mmk2, T_left and T_right should not be None at the same time, ref_pos should not be None if target_height is None
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:279:            return self._inverse_kinematics(T_left, T_right, target_height, ref_arm_pos)
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:285:        res = self._inverse_kinematics(T_left, T_right, target_height, ref_arm_pos)
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:295:            temp_res = self._inverse_kinematics(
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:346:    T_left, T_right = mmk2.forward_kinematics(q)
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:350:    joints_left = mmk2.inverse_kinematics(T_left, None, target_height=q[0], ref_pos=q)
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:353:    joints_right = mmk2.inverse_kinematics(None, T_right, target_height=q[0])
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:356:    joints = mmk2.inverse_kinematics(T_left, T_right, ref_pos=q)
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:359:    T_left, T_right = mmk2.forward_kinematics(joints[0])
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:361:    print("Left Arm Transformation Matrix from Inverse Kinematics:\n", T_left)
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:362:    print("Right Arm Transformation Matrix from Inverse Kinematics:\n", T_right)
+/workspace/material_sorting_task/examples/material_sorting/mmk2_kdl.py:374:    joints_right = mmk2.inverse_kinematics(None, T_right, target_height=ref_pose[0], ref_pos=ref_pose)
+/workspace/material_sorting_task/examples/material_sorting/arm_kdl.py:319:    def forward_kinematics(self, q: np.array) -> np.array:
+/workspace/material_sorting_task/examples/material_sorting/arm_kdl.py:321:        Calculate the forward kinematics of the arm.
+/workspace/material_sorting_task/examples/material_sorting/arm_kdl.py:343:    def inverse_kinematics(self, pose: np.array, ref_pos: np.array = None) -> np.array:
+/workspace/material_sorting_task/examples/material_sorting/arm_kdl.py:345:        Calculate the inverse kinematics of the arm.
+/workspace/material_sorting_task/examples/material_sorting/arm_kdl.py:579:    end_pose = arm_kdl.forward_kinematics(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
+/workspace/material_sorting_task/examples/material_sorting/arm_kdl.py:591:    joints = arm_kdl.inverse_kinematics(
+/workspace/material_sorting_task/examples/material_sorting/arm_kdl.py:609:    #     print("forward_kinematics")
+/workspace/material_sorting_task/examples/material_sorting/arm_kdl.py:610:    #     print(arm_kdl.forward_kinematics(j))
+/workspace/material_sorting_task/examples/material_sorting/client_task_1.py:221:            sols = self.kdl.inverse_kinematics(T_left=T, T_right=None, ref_pos=ref, target_height=float(self.tc[2]))
+/workspace/material_sorting_task/examples/material_sorting/client_task_1.py:226:            sols = self.kdl.inverse_kinematics(T_left=None, T_right=T, ref_pos=ref, target_height=float(self.tc[2]))

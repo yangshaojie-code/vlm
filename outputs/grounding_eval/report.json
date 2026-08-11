@@ -1,0 +1,394 @@
+{
+  "case_count": 19,
+  "found_rate": 1.0,
+  "mean_iou": 0.7629,
+  "iou_at_0.5_rate": 1.0,
+  "cases": [
+    {
+      "image": "clear_three_boxes.png",
+      "description": "粉色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        79,
+        319,
+        252,
+        457
+      ],
+      "truth_bboxes": [
+        [
+          80,
+          340,
+          230,
+          455
+        ]
+      ],
+      "max_iou": 0.7225
+    },
+    {
+      "image": "clear_three_boxes.png",
+      "description": "黄色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        363,
+        327,
+        544,
+        467
+      ],
+      "truth_bboxes": [
+        [
+          365,
+          350,
+          520,
+          465
+        ]
+      ],
+      "max_iou": 0.7034
+    },
+    {
+      "image": "clear_three_boxes.png",
+      "description": "棕色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        647,
+        313,
+        822,
+        457
+      ],
+      "truth_bboxes": [
+        [
+          650,
+          335,
+          810,
+          455
+        ]
+      ],
+      "max_iou": 0.7619
+    },
+    {
+      "image": "clear_three_boxes.png",
+      "description": "圆形工具桶",
+      "found": true,
+      "predicted_bbox": [
+        788,
+        307,
+        915,
+        488
+      ],
+      "truth_bboxes": [
+        [
+          790,
+          305,
+          910,
+          485
+        ]
+      ],
+      "max_iou": 0.9196
+    },
+    {
+      "image": "target_at_edge.png",
+      "description": "粉色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        7,
+        334,
+        146,
+        448
+      ],
+      "truth_bboxes": [
+        [
+          8,
+          350,
+          125,
+          445
+        ]
+      ],
+      "max_iou": 0.7014
+    },
+    {
+      "image": "target_at_edge.png",
+      "description": "黄色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        428,
+        322,
+        613,
+        465
+      ],
+      "truth_bboxes": [
+        [
+          430,
+          345,
+          590,
+          465
+        ]
+      ],
+      "max_iou": 0.7258
+    },
+    {
+      "image": "target_at_edge.png",
+      "description": "棕色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        687,
+        327,
+        871,
+        463
+      ],
+      "truth_bboxes": [
+        [
+          690,
+          350,
+          845,
+          465
+        ]
+      ],
+      "max_iou": 0.6914
+    },
+    {
+      "image": "target_at_edge.png",
+      "description": "圆形工具桶",
+      "found": true,
+      "predicted_bbox": [
+        229,
+        316,
+        357,
+        490
+      ],
+      "truth_bboxes": [
+        [
+          230,
+          315,
+          355,
+          490
+        ]
+      ],
+      "max_iou": 0.9711
+    },
+    {
+      "image": "small_distant_target.png",
+      "description": "粉色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        421,
+        231,
+        497,
+        294
+      ],
+      "truth_bboxes": [
+        [
+          420,
+          245,
+          485,
+          295
+        ]
+      ],
+      "max_iou": 0.6397
+    },
+    {
+      "image": "small_distant_target.png",
+      "description": "黄色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        172,
+        332,
+        356,
+        472
+      ],
+      "truth_bboxes": [
+        [
+          170,
+          355,
+          330,
+          470
+        ]
+      ],
+      "max_iou": 0.6991
+    },
+    {
+      "image": "small_distant_target.png",
+      "description": "棕色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        617,
+        320,
+        808,
+        474
+      ],
+      "truth_bboxes": [
+        [
+          620,
+          345,
+          785,
+          470
+        ]
+      ],
+      "max_iou": 0.7012
+    },
+    {
+      "image": "small_distant_target.png",
+      "description": "圆形工具桶",
+      "found": true,
+      "predicted_bbox": [
+        804,
+        322,
+        919,
+        487
+      ],
+      "truth_bboxes": [
+        [
+          805,
+          320,
+          915,
+          485
+        ]
+      ],
+      "max_iou": 0.9341
+    },
+    {
+      "image": "similar_distractors.png",
+      "description": "粉色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        113,
+        331,
+        277,
+        463
+      ],
+      "truth_bboxes": [
+        [
+          110,
+          350,
+          255,
+          465
+        ],
+        [
+          385,
+          335,
+          535,
+          460
+        ]
+      ],
+      "max_iou": 0.7203
+    },
+    {
+      "image": "similar_distractors.png",
+      "description": "黄色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        663,
+        328,
+        847,
+        464
+      ],
+      "truth_bboxes": [
+        [
+          665,
+          350,
+          825,
+          465
+        ]
+      ],
+      "max_iou": 0.7243
+    },
+    {
+      "image": "similar_distractors.png",
+      "description": "圆形工具桶",
+      "found": true,
+      "predicted_bbox": [
+        13,
+        317,
+        102,
+        489
+      ],
+      "truth_bboxes": [
+        [
+          15,
+          315,
+          100,
+          485
+        ]
+      ],
+      "max_iou": 0.9226
+    },
+    {
+      "image": "partial_occlusion.png",
+      "description": "粉色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        192,
+        316,
+        343,
+        467
+      ],
+      "truth_bboxes": [
+        [
+          190,
+          340,
+          360,
+          465
+        ]
+      ],
+      "max_iou": 0.7497
+    },
+    {
+      "image": "partial_occlusion.png",
+      "description": "黄色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        518,
+        322,
+        703,
+        468
+      ],
+      "truth_bboxes": [
+        [
+          520,
+          345,
+          680,
+          465
+        ]
+      ],
+      "max_iou": 0.7108
+    },
+    {
+      "image": "partial_occlusion.png",
+      "description": "棕色的长方体包装盒",
+      "found": true,
+      "predicted_bbox": [
+        733,
+        329,
+        901,
+        467
+      ],
+      "truth_bboxes": [
+        [
+          735,
+          350,
+          880,
+          465
+        ]
+      ],
+      "max_iou": 0.7192
+    },
+    {
+      "image": "partial_occlusion.png",
+      "description": "圆形工具桶",
+      "found": true,
+      "predicted_bbox": [
+        298,
+        313,
+        474,
+        492
+      ],
+      "truth_bboxes": [
+        [
+          330,
+          310,
+          470,
+          490
+        ]
+      ],
+      "max_iou": 0.7762
+    }
+  ]
+}

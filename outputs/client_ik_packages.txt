@@ -1,0 +1,6 @@
+mujoco: /usr/local/lib/python3.10/dist-packages/mujoco/__init__.py
+scipy: /usr/local/lib/python3.10/dist-packages/scipy/__init__.py
+pinocchio: NOT INSTALLED
+ikpy: NOT INSTALLED
+urdf_parser_py: NOT INSTALLED
+kdl_parser_py: NOT INSTALLED

@@ -1,0 +1,122 @@
+{
+  "instruction": "把粉色包装盒放到工具桶左边",
+  "task": {
+    "task_type": "pick_and_place",
+    "target_object": {
+      "category": "packing_box",
+      "color": "pink",
+      "shape": null
+    },
+    "reference_object": {
+      "category": "tool_bucket"
+    },
+    "direction": "left",
+    "place_target": null,
+    "raw_instruction": "把粉色包装盒放到工具桶左边"
+  },
+  "plan": {
+    "target_description": "粉色的包装盒",
+    "target_grounding": {
+      "found": true,
+      "bbox": [
+        79,
+        316,
+        253,
+        457
+      ],
+      "center": [
+        166,
+        386
+      ]
+    },
+    "target_depth_m": 0.7,
+    "pick_pose": {
+      "position": [
+        0.8916236508445916,
+        0.532124498103105,
+        0.9247222222222222
+      ],
+      "object_position": [
+        0.8916236508445916,
+        0.532124498103105,
+        0.8247222222222222
+      ],
+      "rotation": [
+        [
+          2.220446049250313e-16,
+          0.0,
+          1.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          -1.0,
+          0.0,
+          2.220446049250313e-16
+        ]
+      ],
+      "arm": "r"
+    },
+    "reference_description": "工具桶",
+    "reference_grounding": {
+      "found": true,
+      "bbox": [
+        788,
+        307,
+        912,
+        488
+      ],
+      "center": [
+        850,
+        398
+      ]
+    },
+    "reference_depth_m": 0.7,
+    "place_pose": {
+      "position": [
+        0.884887897704046,
+        0.04424864008090279,
+        0.9130555555555556
+      ],
+      "reference_position": [
+        0.884887897704046,
+        -0.23575135991909718,
+        0.8130555555555556
+      ],
+      "rotation": [
+        [
+          2.220446049250313e-16,
+          0.0,
+          1.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          -1.0,
+          0.0,
+          2.220446049250313e-16
+        ]
+      ],
+      "arm": "r"
+    },
+    "states": [
+      "APPROACH_PICK",
+      "DESCEND_GRASP",
+      "CLOSE_GRIPPER",
+      "LIFT_AFTER_GRASP",
+      "MOVE_TO_PLACE",
+      "DESCEND_PLACE",
+      "OPEN_GRIPPER",
+      "RETREAT",
+      "DONE"
+    ],
+    "depth_source": "演示固定深度: 0.700 m",
+    "warning": "相机内外参仍为占位值，XYZ 仅用于流程演示"
+  }
+}

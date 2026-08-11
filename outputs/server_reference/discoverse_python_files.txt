@@ -1,0 +1,9 @@
+/workspace/material_sorting_task/discoverse/envs/__init__.py
+/workspace/material_sorting_task/discoverse/envs/simulator.py
+/workspace/material_sorting_task/discoverse/__init__.py
+/workspace/material_sorting_task/discoverse/robots_env/mmk2_base.py
+/workspace/material_sorting_task/discoverse/robots/__init__.py
+/workspace/material_sorting_task/discoverse/robots/mmk2/mmk2_fk.py
+/workspace/material_sorting_task/discoverse/utils/base_config.py
+/workspace/material_sorting_task/discoverse/utils/controllor.py
+/workspace/material_sorting_task/discoverse/utils/__init__.py

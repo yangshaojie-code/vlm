@@ -1,0 +1,107 @@
+{
+  "/joint_states": {
+    "names": [
+      "slide_joint",
+      "head_yaw_joint",
+      "head_pitch_joint",
+      "left_arm_joint1",
+      "left_arm_joint2",
+      "left_arm_joint3",
+      "left_arm_joint4",
+      "left_arm_joint5",
+      "left_arm_joint6",
+      "left_arm_eef_gripper_joint",
+      "right_arm_joint1",
+      "right_arm_joint2",
+      "right_arm_joint3",
+      "right_arm_joint4",
+      "right_arm_joint5",
+      "right_arm_joint6",
+      "right_arm_eef_gripper_joint"
+    ],
+    "position_count": 17,
+    "finite_positions": true,
+    "stamp": 1786431655.6013265
+  },
+  "/slamware_ros_sdk_server_node/odom": {
+    "frame_id": "/odom",
+    "child_frame_id": "",
+    "position": [
+      -0.6999999975776602,
+      0.5500487595414453,
+      0.0015668719155325626
+    ],
+    "orientation": [
+      0.0002456355209407038,
+      -0.0002454556871243671,
+      0.7071065699727909,
+      0.7071069071335766
+    ],
+    "stamp": 1786431655.6013265
+  },
+  "/tf": [
+    {
+      "parent": "odom",
+      "child": "base_link",
+      "translation": [
+        -0.6999999975776602,
+        0.5500487595414453,
+        0.0015668719155325626
+      ],
+      "stamp": 1786431655.6013265
+    }
+  ],
+  "/head_camera/color/image_raw": {
+    "height": 480,
+    "width": 640,
+    "encoding": "rgb8",
+    "step": 1920,
+    "is_bigendian": false,
+    "frame_id": "head_camera",
+    "stamp": 1786431655.6013265
+  },
+  "/head_camera/aligned_depth_to_color/image_raw": {
+    "height": 480,
+    "width": 640,
+    "encoding": "mono16",
+    "step": 1280,
+    "is_bigendian": false,
+    "frame_id": "head_camera",
+    "stamp": 1786431655.6013265
+  },
+  "/material/instruction": {
+    "data": "[{\"task\": 1, \"instruction\": \"抓取粉色方块，放到原白色圆柱所在的货架层\", \"target_kind\": \"cuboid_box\", \"target_body\": \"box_pink\", \"target_color\": \"pink\", \"place_type\": \"shelf_point\", \"place_world\": [-2.68, 0.778, 1.156], \"place_radius\": 0.24}, {\"task\": 2, \"instruction\": \"抓取棕色方块，放到粉色方块原来在桌子上的位置\", \"target_kind\": \"cuboid_box\", \"target_body\": \"box_brown\", \"target_color\": \"brown\", \"place_type\": \"table_point\", \"place_world\": [-1.0, 2.2, 0.834], \"place_radius\": 0.28}, {\"task\": 3, \"instruction\": \"抓取黄色方块，放到货架中白色长方体的左边\", \"target_kind\": \"cuboid_box\", \"target_body\": \"box_yellow\", \"target_color\": \"yellow\", \"ref_prop\": \"packaging_box\", \"ref_prop_body\": \"prop_packaging_box\", \"direction\": \"left\", \"place_type\": \"shelf_prop_side\", \"place_world\": [-2.68, 0.54, 0.498], \"place_radius\": 0.24}]"
+  },
+  "/referee/taskinfo": {
+    "data": "任务1: 抓取粉色方块，放到原白色圆柱所在的货架层"
+  },
+  "/referee/gameinfo": {
+    "data": "t=28.1s score=0 task=1/3 best=[0, 0, 0] attempt=0 step=-"
+  },
+  "/referee/score": {
+    "data": 0
+  },
+  "/head_camera/color/camera_info": {
+    "height": 480,
+    "width": 640,
+    "frame_id": "",
+    "distortion_model": "",
+    "k": [
+      575.2890188083568,
+      0.0,
+      320.0,
+      0.0,
+      575.2890188083566,
+      240.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "stamp": 0.0
+  },
+  "_meta": {
+    "collected_at": "2026-08-11T07:00:56+0000",
+    "missing_required": [],
+    "timeout_sec": 15.0
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "mode": "controlled_real_joint_feedback_check",
+  "channel": "head_yaw",
+  "joint_name": "head_yaw_joint",
+  "delta": 0.1,
+  "apply": true,
+  "published_control_channels": [
+    "head_yaw"
+  ],
+  "formal_motion_stays_disabled": true,
+  "initial": -8.274343749796814e-05,
+  "target": 0.09991725656250204,
+  "reached_target": 0.08497095248636727,
+  "returned": 0.015661163216822132,
+  "status": "passed",
+  "finished_at": "2026-08-12T02:21:23+0000"
+}

@@ -1,0 +1,183 @@
+{
+  "mode": "task1_bimanual_noncontact_approach_campaign",
+  "apply": true,
+  "formal_motion_stays_disabled": true,
+  "gripper_motion_commanded": true,
+  "box_contact_commanded": false,
+  "base_motion_commanded": false,
+  "transport_or_place_commanded": false,
+  "published_control_topics": [
+    "/left_arm_forward_position_controller/commands",
+    "/right_arm_forward_position_controller/commands"
+  ],
+  "clearance_schedule_m": [
+    0.03,
+    0.02
+  ],
+  "gripper_open_target": 1.0,
+  "position_reference": {
+    "source": "/tmp/task1_precontact_position_retry.json",
+    "center_world": [
+      -0.9944485704639217,
+      2.2068280960012467,
+      0.834
+    ],
+    "center_base": [
+      0.5822067766706263,
+      -0.010329049109928969,
+      0.8324331288486939
+    ],
+    "position_report_final_base": [
+      -0.9827652259350151,
+      1.6243570225256319,
+      1.6184000465462038
+    ],
+    "current_base": [
+      -0.9827778361192466,
+      1.62464666893871,
+      1.6085795439953918
+    ],
+    "base_drift_position_m": 0.00028992078462124074,
+    "base_drift_yaw_rad": 0.009820502550812016
+  },
+  "initial_slide": 0.012125532502681939,
+  "target_slide": 0.444204051151306,
+  "initial_left_gripper": 0.0060722660283670064,
+  "initial_right_gripper": 0.005775772496351915,
+  "gripper_open_waypoint_count": 10,
+  "high_pregrasp_plan": {
+    "slide": 0.012125532502681939,
+    "left_target_position": [
+      0.48240646,
+      0.22475936,
+      1.309511647497318
+    ],
+    "right_target_position": [
+      0.48240646,
+      -0.22475936,
+      1.309511647497318
+    ],
+    "left_joint_target": [
+      4.069304536984003e-08,
+      -4.8736624957967933e-08,
+      1.6598624696939623e-09,
+      -1.510000006610098,
+      -0.7660000446836697,
+      1.5700000030157617
+    ],
+    "right_joint_target": [
+      -4.069304536984003e-08,
+      -4.8736624957967933e-08,
+      1.6598624696939623e-09,
+      1.510000006610098,
+      0.7660000446836697,
+      -1.5700000030157617
+    ],
+    "left_fk_position": [
+      0.4824064600386444,
+      0.2247593603776793,
+      1.3095116494973182
+    ],
+    "right_fk_position": [
+      0.4824064600386444,
+      -0.2247593603776793,
+      1.3095116494973182
+    ],
+    "left_fk_error_m": 2.0357150366008468e-09,
+    "right_fk_error_m": 2.0357150366008468e-09,
+    "lateral_offset_m": 0.22475936
+  },
+  "clearance_plans": [
+    {
+      "slide": 0.444204051151306,
+      "left_target_position": [
+        0.5322067766706262,
+        0.14967095089007104,
+        0.877433128848694
+      ],
+      "right_target_position": [
+        0.5322067766706262,
+        -0.17032904910992896,
+        0.877433128848694
+      ],
+      "left_joint_target": [
+        1.2687377821107827e-08,
+        -0.7533064721950873,
+        0.16329591092990103,
+        -1.527663872290613,
+        -1.3552811370700826,
+        1.6046118577072084
+      ],
+      "right_joint_target": [
+        -1.4317245291501676e-08,
+        -0.6105847200732506,
+        0.15260324439193607,
+        1.5259833029031198,
+        1.2233792602573068,
+        -1.5985746854040594
+      ],
+      "left_fk_position": [
+        0.5322067765352696,
+        0.14967095094267993,
+        0.8774331308486939
+      ],
+      "right_fk_position": [
+        0.5322067765352696,
+        -0.17032904868498722,
+        0.8774331308486939
+      ],
+      "left_fk_error_m": 2.005265289722808e-09,
+      "right_fk_error_m": 2.0491209521394468e-09,
+      "clearance_m": 0.03
+    },
+    {
+      "slide": 0.444204051151306,
+      "left_target_position": [
+        0.5322067766706262,
+        0.13967095089007103,
+        0.877433128848694
+      ],
+      "right_target_position": [
+        0.5322067766706262,
+        -0.16032904910992896,
+        0.877433128848694
+      ],
+      "left_joint_target": [
+        1.2024737161440978e-08,
+        -0.8226918312256282,
+        0.17210569570529932,
+        -1.5281507525983407,
+        -1.415801042295905,
+        1.607253899295307
+      ],
+      "right_joint_target": [
+        -1.3479042462188535e-08,
+        -0.6793551489606844,
+        0.15648868466247956,
+        1.5269209034300373,
+        1.2882005159581624,
+        -1.6015993441558218
+      ],
+      "left_fk_position": [
+        0.5322067765352697,
+        0.1396709506766175,
+        0.8774331308486939
+      ],
+      "right_fk_position": [
+        0.5322067772423764,
+        -0.1603290491260316,
+        0.8774331308486939
+      ],
+      "left_fk_error_m": 2.015907628700261e-09,
+      "right_fk_error_m": 2.080182050522437e-09,
+      "clearance_m": 0.02
+    }
+  ],
+  "waypoint_counts": [
+    32
+  ],
+  "status": "failed",
+  "error": "current gripper feedback is invalid",
+  "recovery_error": "current gripper feedback is invalid",
+  "finished_at": "2026-08-12T07:55:35+0000"
+}

@@ -1,8 +1,8 @@
-"""Small dependency-free baseline detector for the three colored boxes.
+"""Small dependency-free detector for the three colored competition boxes.
 
-It is intended for offline development and as a deterministic fallback. The
-formal container can later replace it with a YOLO node without changing the
-mission protocol or motion code.
+It is a deterministic fallback, not a replacement for a trained detector.
+The filters intentionally reject scene-scale regions: the wooden tabletop is
+brown/yellow enough to pass broad RGB thresholds but cannot be one box.
 """
 
 from dataclasses import dataclass
@@ -44,17 +44,36 @@ def _rgb_array(image) -> np.ndarray:
 
 
 def _mask(rgb: np.ndarray, color: str) -> np.ndarray:
-    r, g, b = [rgb[..., i].astype(np.int16) for i in range(3)]
+    """Return an HSV mask tuned to the rendered competition materials."""
+    values = rgb.astype(np.float32) / 255.0
+    r, g, b = values[..., 0], values[..., 1], values[..., 2]
+    maximum = np.max(values, axis=2)
+    minimum = np.min(values, axis=2)
+    delta = maximum - minimum
+    hue = np.zeros_like(maximum)
+    valid = delta > 1e-6
+    red = valid & (maximum == r)
+    green = valid & (maximum == g)
+    blue = valid & (maximum == b)
+    hue[red] = ((g[red] - b[red]) / delta[red]) % 6.0
+    hue[green] = (b[green] - r[green]) / delta[green] + 2.0
+    hue[blue] = (r[blue] - g[blue]) / delta[blue] + 4.0
+    hue *= 60.0
+    saturation = np.divide(delta, maximum, out=np.zeros_like(delta), where=maximum > 1e-6)
     if color == "pink":
-        return (r > 150) & (b > 90) & (r > g + 35) & (b > g - 20)
+        return (hue >= 320.0) & (hue <= 355.0) & (saturation >= 0.30) & (maximum >= 0.45)
     if color == "yellow":
-        return (r > 160) & (g > 125) & (b < 150) & (r - b > 60) & (g - b > 35)
+        # The table is orange-brown (about 25-35 degrees), while the yellow
+        # box is near 50 degrees.  The hue lower bound is the critical split.
+        return (hue >= 42.0) & (hue <= 70.0) & (saturation >= 0.42) & (maximum >= 0.55)
     if color == "brown":
-        return (r > 45) & (r > g + 20) & (g > b + 12) & (b < 135) & (r < 210)
+        # Require stronger chroma than the wooden tabletop.  The fixed-layout
+        # shelf box has a distinctly more saturated brown front face.
+        return (hue >= 12.0) & (hue <= 40.0) & (saturation >= 0.53) & (maximum >= 0.22) & (maximum <= 0.82)
     raise ValueError(f"不支持的颜色: {color}")
 
 
-def _components(mask: np.ndarray, min_area: int) -> Iterable[tuple]:
+def _components(mask: np.ndarray, min_area: int, max_area: int, max_bbox_area: int, min_span: int) -> Iterable[tuple]:
     height, width = mask.shape
     visited = np.zeros_like(mask, dtype=bool)
     for y, x in zip(*np.nonzero(mask)):
@@ -74,16 +93,24 @@ def _components(mask: np.ndarray, min_area: int) -> Iterable[tuple]:
                 if 0 <= ny < height and 0 <= nx < width and mask[ny, nx] and not visited[ny, nx]:
                     visited[ny, nx] = True
                     stack.append((ny, nx))
-        if count >= min_area:
+        bbox_area = (x_max + 1 - x_min) * (y_max + 1 - y_min)
+        width, height = x_max + 1 - x_min, y_max + 1 - y_min
+        if min_area <= count <= max_area and bbox_area <= max_bbox_area and width >= min_span and height >= min_span:
             yield x_min, y_min, x_max + 1, y_max + 1, count
 
 
 def detect_colored_boxes(image, color: Optional[str] = None, min_area: int = 80) -> List[BoxDetection]:
     rgb = _rgb_array(image)
     colors = [normalize_color(color)] if color is not None else ["pink", "yellow", "brown"]
+    image_area = rgb.shape[0] * rgb.shape[1]
+    # A rendered box occupies a compact region.  The values are intentionally
+    # generous for close views but eliminate table/wall-sized false positives.
+    max_area = max(min_area, int(image_area * 0.06))
+    max_bbox_area = max(min_area, int(image_area * 0.10))
+    min_span = 12
     detections = []
     for name in colors:
-        for x1, y1, x2, y2, area in _components(_mask(rgb, name), min_area):
+        for x1, y1, x2, y2, area in _components(_mask(rgb, name), min_area, max_area, max_bbox_area, min_span):
             box_area = max(1, (x2 - x1) * (y2 - y1))
             confidence = min(1.0, area / box_area * 2.0)
             detections.append(BoxDetection(name, (x1, y1, x2, y2), ((x1 + x2) // 2, (y1 + y2) // 2), area, confidence))

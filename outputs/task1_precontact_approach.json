@@ -1,0 +1,46 @@
+{
+  "mode": "task1_pink_precontact_check",
+  "stage": "approach",
+  "apply": true,
+  "formal_motion_stays_disabled": true,
+  "gripper_motion_commanded": false,
+  "published_control_topics": [],
+  "standoff_m": 0.54,
+  "clearance_m": 0.03,
+  "detection": {
+    "bbox": [
+      338,
+      352,
+      466,
+      480
+    ],
+    "pixel": [
+      402,
+      416
+    ],
+    "depth_m": 1.1180000305175781,
+    "surface_world": [
+      -0.9943806039739465,
+      2.1260397694807933,
+      0.8906922364772887
+    ],
+    "center_world": [
+      -0.9943806039739465,
+      2.2060397694807934,
+      0.834
+    ],
+    "center_base": [
+      1.3076067161410665,
+      -0.14460718108276405,
+      0.8324331280211109
+    ]
+  },
+  "station_target": [
+    -0.9943806039739465,
+    1.6660397694807934,
+    1.5707963267948966
+  ],
+  "status": "failed",
+  "error": "box is outside the safe base-frame approach window: [1.3076067161410665, -0.14460718108276405, 0.8324331280211109]",
+  "finished_at": "2026-08-12T06:35:12+0000"
+}

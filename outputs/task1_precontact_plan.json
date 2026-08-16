@@ -1,0 +1,45 @@
+{
+  "mode": "task1_pink_precontact_check",
+  "stage": "plan",
+  "apply": false,
+  "formal_motion_stays_disabled": true,
+  "gripper_motion_commanded": false,
+  "published_control_topics": [],
+  "standoff_m": 0.54,
+  "clearance_m": 0.03,
+  "detection": {
+    "bbox": [
+      165,
+      293,
+      269,
+      386
+    ],
+    "pixel": [
+      217,
+      339
+    ],
+    "depth_m": 1.4450000524520874,
+    "surface_world": [
+      -0.9946041986367556,
+      2.120207863818587,
+      0.874189056870242
+    ],
+    "center_world": [
+      -0.9946041986367556,
+      2.200207863818587,
+      0.834
+    ],
+    "center_base": [
+      1.6501589732945512,
+      0.294604988029441,
+      0.8324331280844675
+    ]
+  },
+  "station_target": [
+    -0.9946041986367556,
+    1.660207863818587,
+    1.5707963267948966
+  ],
+  "status": "dry_run",
+  "finished_at": "2026-08-12T06:32:59+0000"
+}

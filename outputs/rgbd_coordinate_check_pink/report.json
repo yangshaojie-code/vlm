@@ -1,0 +1,552 @@
+{
+  "mode": "read_only_fixed_layout_coordinate_check",
+  "requested_samples": 10,
+  "collected_samples": 10,
+  "colors": [
+    "pink"
+  ],
+  "callback_errors": [],
+  "notes": [
+    "Cyan cross is the projection of the fixed-layout box center; rectangle is the RGB detector.",
+    "surface_world_error_m compares RGB-D with the expected visible AABB surface and is the primary coordinate metric.",
+    "raw_world_error_m compares a visible surface with the physical center and therefore includes the box half-size.",
+    "Fixed coordinates must not be used as formal randomized-layout motion targets."
+  ],
+  "summary": {
+    "pink": {
+      "requested_samples": 10,
+      "detected_samples": 10,
+      "detection_rate": 1.0,
+      "median_pixel_error_px": 5.023870204388267,
+      "max_pixel_error_px": 5.023870221071409,
+      "median_surface_depth_error_m": 0.0011691197671163112,
+      "max_surface_depth_error_m": 0.0011691199314116663,
+      "median_surface_world_error_m": 0.012910949508904538,
+      "max_surface_world_error_m": 0.012910949514826364,
+      "median_raw_world_error_m": 0.08938794284632016,
+      "max_raw_world_error_m": 0.08938794299952757,
+      "median_observed_world_surface": [
+        -0.9971159796731356,
+        2.120208231010512,
+        0.874189057647317
+      ],
+      "fixed_box_center": [
+        -1.0,
+        2.2,
+        0.834
+      ]
+    }
+  },
+  "samples": [
+    {
+      "sample": 1,
+      "stamp": 1786498716.895544,
+      "color": "pink",
+      "detected": true,
+      "bbox": [
+        165,
+        293,
+        268,
+        386
+      ],
+      "detected_pixel": [
+        216,
+        339
+      ],
+      "expected_center_pixel": [
+        220.91559197435907,
+        337.96258612898
+      ],
+      "pixel_error_px": 5.023870221071409,
+      "surface_depth_m": 1.4450000524520874,
+      "expected_surface_depth_m": 1.4438309328492662,
+      "surface_depth_error_m": 0.001169119602821178,
+      "observed_world_surface": [
+        -0.9971159796731356,
+        2.120208230838879,
+        0.874189057647317
+      ],
+      "expected_world_surface": [
+        -0.9845677422101686,
+        2.12,
+        0.8772207227936186
+      ],
+      "surface_world_delta": [
+        -0.01254823746296696,
+        0.00020823083887888671,
+        -0.0030316651463015987
+      ],
+      "surface_world_error_m": 0.012910949502982636,
+      "fixed_box_center": [
+        -1.0,
+        2.2,
+        0.834
+      ],
+      "world_delta_surface_to_center": [
+        0.0028840203268644116,
+        -0.07979176916112118,
+        0.04018905764731706
+      ],
+      "raw_world_error_m": 0.08938794299952757
+    },
+    {
+      "sample": 2,
+      "stamp": 1786498717.3113513,
+      "color": "pink",
+      "detected": true,
+      "bbox": [
+        165,
+        293,
+        268,
+        386
+      ],
+      "detected_pixel": [
+        216,
+        339
+      ],
+      "expected_center_pixel": [
+        220.91559197291105,
+        337.9625861332624
+      ],
+      "pixel_error_px": 5.023870218770284,
+      "surface_depth_m": 1.4450000524520874,
+      "expected_surface_depth_m": 1.4438309328266048,
+      "surface_depth_error_m": 0.0011691196254826064,
+      "observed_world_surface": [
+        -0.9971159796731356,
+        2.1202082308625525,
+        0.874189057647317
+      ],
+      "expected_world_surface": [
+        -0.9845677422099016,
+        2.12,
+        0.8772207227943662
+      ],
+      "surface_world_delta": [
+        -0.012548237463233969,
+        0.0002082308625523943,
+        -0.003031665147049223
+      ],
+      "surface_world_error_m": 0.012910949503799509,
+      "fixed_box_center": [
+        -1.0,
+        2.2,
+        0.834
+      ],
+      "world_delta_surface_to_center": [
+        0.0028840203268644116,
+        -0.07979176913744768,
+        0.04018905764731706
+      ],
+      "raw_world_error_m": 0.08938794297839552
+    },
+    {
+      "sample": 3,
+      "stamp": 1786498717.7281485,
+      "color": "pink",
+      "detected": true,
+      "bbox": [
+        165,
+        293,
+        268,
+        386
+      ],
+      "detected_pixel": [
+        216,
+        339
+      ],
+      "expected_center_pixel": [
+        220.915591970015,
+        337.96258614182693
+      ],
+      "pixel_error_px": 5.023870214168092,
+      "surface_depth_m": 1.4450000524520874,
+      "expected_surface_depth_m": 1.443830932781282,
+      "surface_depth_error_m": 0.001169119670805463,
+      "observed_world_surface": [
+        -0.9971159796731356,
+        2.1202082309098995,
+        0.874189057647317
+      ],
+      "expected_world_surface": [
+        -0.9845677422093677,
+        2.12,
+        0.8772207227958615
+      ],
+      "surface_world_delta": [
+        -0.012548237463767875,
+        0.0002082309098994095,
+        -0.0030316651485444712
+      ],
+      "surface_world_error_m": 0.012910949505433145,
+      "fixed_box_center": [
+        -1.0,
+        2.2,
+        0.834
+      ],
+      "world_delta_surface_to_center": [
+        0.0028840203268644116,
+        -0.07979176909010066,
+        0.04018905764731706
+      ],
+      "raw_world_error_m": 0.0893879429361314
+    },
+    {
+      "sample": 4,
+      "stamp": 1786498718.1447678,
+      "color": "pink",
+      "detected": true,
+      "bbox": [
+        165,
+        293,
+        268,
+        386
+      ],
+      "detected_pixel": [
+        216,
+        339
+      ],
+      "expected_center_pixel": [
+        220.91559196856687,
+        337.96258614610923
+      ],
+      "pixel_error_px": 5.023870211866906,
+      "surface_depth_m": 1.4450000524520874,
+      "expected_surface_depth_m": 1.4438309327586207,
+      "surface_depth_error_m": 0.0011691196934666692,
+      "observed_world_surface": [
+        -0.9971159796731356,
+        2.120208230933573,
+        0.874189057647317
+      ],
+      "expected_world_surface": [
+        -0.9845677422091008,
+        2.12,
+        0.8772207227966091
+      ],
+      "surface_world_delta": [
+        -0.012548237464034773,
+        0.0002082309335729171,
+        -0.0030316651492920954
+      ],
+      "surface_world_error_m": 0.012910949506249908,
+      "fixed_box_center": [
+        -1.0,
+        2.2,
+        0.834
+      ],
+      "world_delta_surface_to_center": [
+        0.0028840203268644116,
+        -0.07979176906642715,
+        0.04018905764731706
+      ],
+      "raw_world_error_m": 0.08938794291499935
+    },
+    {
+      "sample": 5,
+      "stamp": 1786498718.5614347,
+      "color": "pink",
+      "detected": true,
+      "bbox": [
+        165,
+        293,
+        268,
+        386
+      ],
+      "detected_pixel": [
+        216,
+        339
+      ],
+      "expected_center_pixel": [
+        220.91559196530875,
+        337.9625861557444
+      ],
+      "pixel_error_px": 5.023870206689368,
+      "surface_depth_m": 1.4450000524520874,
+      "expected_surface_depth_m": 1.4438309327076324,
+      "surface_depth_error_m": 0.001169119744454994,
+      "observed_world_surface": [
+        -0.9971159796731356,
+        2.1202082309868384,
+        0.874189057647317
+      ],
+      "expected_world_surface": [
+        -0.9845677422085002,
+        2.12,
+        0.8772207227982912
+      ],
+      "surface_world_delta": [
+        -0.012548237464635403,
+        0.0002082309868383092,
+        -0.0030316651509741943
+      ],
+      "surface_world_error_m": 0.012910949508087721,
+      "fixed_box_center": [
+        -1.0,
+        2.2,
+        0.834
+      ],
+      "world_delta_surface_to_center": [
+        0.0028840203268644116,
+        -0.07979176901316176,
+        0.04018905764731706
+      ],
+      "raw_world_error_m": 0.08938794286745222
+    },
+    {
+      "sample": 6,
+      "stamp": 1786498718.977948,
+      "color": "pink",
+      "detected": true,
+      "bbox": [
+        165,
+        293,
+        268,
+        386
+      ],
+      "detected_pixel": [
+        216,
+        339
+      ],
+      "expected_center_pixel": [
+        220.9155919624127,
+        337.962586164309
+      ],
+      "pixel_error_px": 5.023870202087164,
+      "surface_depth_m": 1.4450000524520874,
+      "expected_surface_depth_m": 1.4438309326623098,
+      "surface_depth_error_m": 0.0011691197897776284,
+      "observed_world_surface": [
+        -0.9971159796731356,
+        2.1202082310341854,
+        0.874189057647317
+      ],
+      "expected_world_surface": [
+        -0.9845677422079663,
+        2.12,
+        0.8772207227997865
+      ],
+      "surface_world_delta": [
+        -0.01254823746516931,
+        0.0002082310341853244,
+        -0.0030316651524694427
+      ],
+      "surface_world_error_m": 0.012910949509721357,
+      "fixed_box_center": [
+        -1.0,
+        2.2,
+        0.834
+      ],
+      "world_delta_surface_to_center": [
+        0.0028840203268644116,
+        -0.07979176896581475,
+        0.04018905764731706
+      ],
+      "raw_world_error_m": 0.08938794282518811
+    },
+    {
+      "sample": 7,
+      "stamp": 1786498719.3947332,
+      "color": "pink",
+      "detected": true,
+      "bbox": [
+        165,
+        293,
+        268,
+        386
+      ],
+      "detected_pixel": [
+        216,
+        339
+      ],
+      "expected_center_pixel": [
+        220.91559196096466,
+        337.9625861685914
+      ],
+      "pixel_error_px": 5.023870199786051,
+      "surface_depth_m": 1.4450000524520874,
+      "expected_surface_depth_m": 1.4438309326396481,
+      "surface_depth_error_m": 0.0011691198124392788,
+      "observed_world_surface": [
+        -0.9971159796731356,
+        2.120208231057859,
+        0.874189057647317
+      ],
+      "expected_world_surface": [
+        -0.9845677422076994,
+        2.12,
+        0.877220722800534
+      ],
+      "surface_world_delta": [
+        -0.012548237465436207,
+        0.000208231057858832,
+        -0.003031665153216956
+      ],
+      "surface_world_error_m": 0.012910949510538094,
+      "fixed_box_center": [
+        -1.0,
+        2.2,
+        0.834
+      ],
+      "world_delta_surface_to_center": [
+        0.0028840203268644116,
+        -0.07979176894214124,
+        0.04018905764731706
+      ],
+      "raw_world_error_m": 0.08938794280405606
+    },
+    {
+      "sample": 8,
+      "stamp": 1786498719.8116379,
+      "color": "pink",
+      "detected": true,
+      "bbox": [
+        165,
+        293,
+        268,
+        386
+      ],
+      "detected_pixel": [
+        216,
+        339
+      ],
+      "expected_center_pixel": [
+        220.9155919577065,
+        337.9625861782265
+      ],
+      "pixel_error_px": 5.023870194608498,
+      "surface_depth_m": 1.4450000524520874,
+      "expected_surface_depth_m": 1.44383093258866,
+      "surface_depth_error_m": 0.0011691198634273814,
+      "observed_world_surface": [
+        -0.9971159796731356,
+        2.1202082311111243,
+        0.874189057647317
+      ],
+      "expected_world_surface": [
+        -0.9845677422070988,
+        2.12,
+        0.8772207228022162
+      ],
+      "surface_world_delta": [
+        -0.012548237466036838,
+        0.0002082311111242241,
+        -0.0030316651548991658
+      ],
+      "surface_world_error_m": 0.012910949512375935,
+      "fixed_box_center": [
+        -1.0,
+        2.2,
+        0.834
+      ],
+      "world_delta_surface_to_center": [
+        0.0028840203268644116,
+        -0.07979176888887585,
+        0.04018905764731706
+      ],
+      "raw_world_error_m": 0.08938794275650892
+    },
+    {
+      "sample": 9,
+      "stamp": 1786498720.2282252,
+      "color": "pink",
+      "detected": true,
+      "bbox": [
+        165,
+        293,
+        268,
+        386
+      ],
+      "detected_pixel": [
+        216,
+        339
+      ],
+      "expected_center_pixel": [
+        220.91559195625842,
+        337.96258618250874
+      ],
+      "pixel_error_px": 5.023870192307352,
+      "surface_depth_m": 1.4450000524520874,
+      "expected_surface_depth_m": 1.4438309325659986,
+      "surface_depth_error_m": 0.0011691198860888097,
+      "observed_world_surface": [
+        -0.9971159796731356,
+        2.120208231134798,
+        0.874189057647317
+      ],
+      "expected_world_surface": [
+        -0.9845677422068319,
+        2.12,
+        0.8772207228029638
+      ],
+      "surface_world_delta": [
+        -0.012548237466303735,
+        0.0002082311347977317,
+        -0.00303166515564679
+      ],
+      "surface_world_error_m": 0.0129109495131927,
+      "fixed_box_center": [
+        -1.0,
+        2.2,
+        0.834
+      ],
+      "world_delta_surface_to_center": [
+        0.0028840203268644116,
+        -0.07979176886520234,
+        0.04018905764731706
+      ],
+      "raw_world_error_m": 0.08938794273537687
+    },
+    {
+      "sample": 10,
+      "stamp": 1786498720.6447227,
+      "color": "pink",
+      "detected": true,
+      "bbox": [
+        165,
+        293,
+        268,
+        386
+      ],
+      "detected_pixel": [
+        216,
+        339
+      ],
+      "expected_center_pixel": [
+        220.91559195336237,
+        337.96258619107334
+      ],
+      "pixel_error_px": 5.023870187705148,
+      "surface_depth_m": 1.4450000524520874,
+      "expected_surface_depth_m": 1.4438309325206757,
+      "surface_depth_error_m": 0.0011691199314116663,
+      "observed_world_surface": [
+        -0.9971159796731356,
+        2.120208231182145,
+        0.8741890576473169
+      ],
+      "expected_world_surface": [
+        -0.984567742206298,
+        2.12,
+        0.8772207228044591
+      ],
+      "surface_world_delta": [
+        -0.012548237466837642,
+        0.0002082311821447469,
+        -0.0030316651571421493
+      ],
+      "surface_world_error_m": 0.012910949514826364,
+      "fixed_box_center": [
+        -1.0,
+        2.2,
+        0.834
+      ],
+      "world_delta_surface_to_center": [
+        0.0028840203268644116,
+        -0.07979176881785532,
+        0.04018905764731695
+      ],
+      "raw_world_error_m": 0.0893879426931127
+    }
+  ]
+}

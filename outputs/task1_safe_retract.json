@@ -1,0 +1,10 @@
+{
+  "mode": "task1_safe_retract",
+  "apply": true,
+  "formal_motion_stays_disabled": true,
+  "base_motion_commanded": false,
+  "published_control_topics": [],
+  "status": "failed",
+  "error": "[Errno 2] No such file or directory: '/tmp/task1_precontact_position_retry.json'",
+  "finished_at": "2026-08-12T09:15:42+0000"
+}

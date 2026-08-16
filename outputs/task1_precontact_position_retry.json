@@ -1,0 +1,66 @@
+{
+  "mode": "task1_pink_precontact_check",
+  "stage": "position",
+  "apply": true,
+  "formal_motion_stays_disabled": true,
+  "gripper_motion_commanded": false,
+  "published_control_topics": [
+    "/cmd_vel"
+  ],
+  "standoff_m": 0.54,
+  "clearance_m": 0.03,
+  "detection": {
+    "bbox": [
+      338,
+      352,
+      466,
+      480
+    ],
+    "pixel": [
+      402,
+      416
+    ],
+    "depth_m": 1.1190000772476196,
+    "surface_world": [
+      -0.9944485704639217,
+      2.1268280960012467,
+      0.8900815593482125
+    ],
+    "center_world": [
+      -0.9944485704639217,
+      2.2068280960012467,
+      0.834
+    ],
+    "center_base": [
+      1.30845569590573,
+      -0.14474975961877662,
+      0.832433128021124
+    ]
+  },
+  "station_target": [
+    -0.9944485704639217,
+    1.6668280960012467,
+    1.5707963267948966
+  ],
+  "initial_base": [
+    -0.7878036530383827,
+    0.9067101478288379,
+    1.8385994141301192
+  ],
+  "base_path_length_m": 0.7436668008744385,
+  "last_base": [
+    -0.9827652259350151,
+    1.6243570225256319,
+    1.6184000465462038
+  ],
+  "remaining_position_error_m": 0.04404875278089273,
+  "remaining_yaw_error_rad": -0.04760371975130706,
+  "navigation_phase": "complete",
+  "final_base": [
+    -0.9827652259350151,
+    1.6243570225256319,
+    1.6184000465462038
+  ],
+  "status": "passed",
+  "finished_at": "2026-08-12T06:59:26+0000"
+}

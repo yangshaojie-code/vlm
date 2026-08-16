@@ -1,0 +1,44 @@
+{
+  "mode": "controlled_single_gripper_feedback_check",
+  "arm": "r",
+  "joint_name": "right_arm_eef_gripper_joint",
+  "delta": 0.1,
+  "apply": true,
+  "published_control_topics": [
+    "/right_arm_forward_position_controller/commands"
+  ],
+  "other_arm_commanded": false,
+  "base_head_spine_commanded": false,
+  "six_arm_joints_preserved": true,
+  "formal_motion_stays_disabled": true,
+  "initial_arm_joints": [
+    0.0003498832955675591,
+    3.193583470700188e-06,
+    -4.802788430648095e-06,
+    -7.597411917864936e-05,
+    -0.005703634214279899,
+    -0.00011925326031465319
+  ],
+  "initial_gripper": 0.00449579886407115,
+  "target_gripper": 0.10449579886407115,
+  "reached_gripper": 0.10523361329578607,
+  "reached_arm_joints": [
+    0.000525387217230096,
+    5.203036763625152e-06,
+    -6.5401623697233024e-06,
+    -0.0001136543068801176,
+    -0.008555369255002025,
+    -0.00017870857510977585
+  ],
+  "returned_gripper": 0.012066087556929795,
+  "returned_arm_joints": [
+    0.0005242448740432551,
+    5.306545043290867e-06,
+    -6.9658857277523364e-06,
+    -0.00011749729360559126,
+    -0.008559205810061418,
+    -0.00018028475723133705
+  ],
+  "status": "passed",
+  "finished_at": "2026-08-12T07:46:16+0000"
+}

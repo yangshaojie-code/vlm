@@ -1,0 +1,13 @@
+{
+  "mode": "task1_pink_precontact_check",
+  "stage": "approach",
+  "apply": false,
+  "formal_motion_stays_disabled": true,
+  "gripper_motion_commanded": false,
+  "published_control_topics": [],
+  "standoff_m": 0.54,
+  "clearance_m": 0.03,
+  "status": "failed",
+  "error": "no pink box detected in the current RGB frame",
+  "finished_at": "2026-08-12T07:08:11+0000"
+}

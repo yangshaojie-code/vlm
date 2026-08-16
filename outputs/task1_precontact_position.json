@@ -1,0 +1,46 @@
+{
+  "mode": "task1_pink_precontact_check",
+  "stage": "position",
+  "apply": true,
+  "formal_motion_stays_disabled": true,
+  "gripper_motion_commanded": false,
+  "published_control_topics": [],
+  "standoff_m": 0.54,
+  "clearance_m": 0.03,
+  "detection": {
+    "bbox": [
+      165,
+      293,
+      269,
+      386
+    ],
+    "pixel": [
+      217,
+      339
+    ],
+    "depth_m": 1.4450000524520874,
+    "surface_world": [
+      -0.9946041986367555,
+      2.1202078670734505,
+      0.8741890568701669
+    ],
+    "center_world": [
+      -0.9946041986367555,
+      2.2002078670734506,
+      0.834
+    ],
+    "center_base": [
+      1.6501589732945516,
+      0.2946049880294409,
+      0.8324331280844675
+    ]
+  },
+  "station_target": [
+    -0.9946041986367555,
+    1.6602078670734506,
+    1.5707963267948966
+  ],
+  "status": "failed",
+  "error": "base did not reach the requested pre-contact station",
+  "finished_at": "2026-08-12T06:34:10+0000"
+}

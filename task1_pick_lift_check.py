@@ -38,6 +38,10 @@ MAX_TEST_LIFT_M = 0.12
 CONTACT_MIN_JOINT_RESIDUAL_RAD = 0.015
 CONTACT_MAX_JOINT_RESIDUAL_RAD = 0.08
 CONTACT_STABLE_SAMPLES = 3
+# Real Server feedback settled within about 0.01 rad at a non-contact
+# approach waypoint. Keep a small margin here; the final contact check below
+# still requires simultaneous bounded residuals on both arms.
+APPROACH_JOINT_TOLERANCE_RAD = 0.015
 # These are the verified fixed-layout Task 1 values from the supplied
 # reference client.  The wider 0.13 m pose is only an approach waypoint;
 # carrying uses a slightly tighter, but not over-compressed, 0.115 m half gap.
@@ -157,6 +161,7 @@ def main(argv=None) -> int:
     parser.add_argument("--joint-max-step", type=float, default=0.05)
     parser.add_argument("--spine-max-step", type=float, default=MAX_SPINE_STEP)
     parser.add_argument("--spine-tolerance", type=float, default=0.010)
+    parser.add_argument("--approach-joint-tolerance", type=float, default=APPROACH_JOINT_TOLERANCE_RAD)
     parser.add_argument("--settle-timeout", type=float, default=15.0)
     parser.add_argument("--hold-seconds", type=float, default=2.0)
     parser.add_argument("--apply", action="store_true")
@@ -164,7 +169,13 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if not 0.02 <= args.joint_max_step <= MAX_ARM_STEP or not 0.02 <= args.spine_max_step <= MAX_SPINE_STEP:
         parser.error("joint/spine max steps are outside safety bounds")
-    if not 0.0 <= args.gripper_open <= 1.0 or args.settle_timeout <= 0 or args.spine_tolerance <= 0 or args.hold_seconds < 0:
+    if (
+        not 0.0 <= args.gripper_open <= 1.0
+        or args.settle_timeout <= 0
+        or args.spine_tolerance <= 0
+        or not 0.010 <= args.approach_joint_tolerance <= 0.020
+        or args.hold_seconds < 0
+    ):
         parser.error("gripper, timeout, tolerance, or hold arguments are invalid")
     if not TASK1_HOLD_HALF_M <= args.hold_half <= args.approach_half <= TASK1_APPROACH_HALF_M:
         parser.error("hold-half must be within [0.115, approach-half], and approach-half <= 0.13 m")
@@ -185,6 +196,7 @@ def main(argv=None) -> int:
         "transport_or_place_commanded": False,
         "contact_clearance_schedule_m": clearances,
         "lift_height_m": args.lift_height,
+        "approach_joint_tolerance_rad": args.approach_joint_tolerance,
         "published_control_topics": [],
     }
     node = None
@@ -244,7 +256,7 @@ def main(argv=None) -> int:
         command_issued = True
         high_left, high_right = _traverse_pair(
             node, initial_left, initial_right, high_plan["left_joint_target"], high_plan["right_joint_target"],
-            args.joint_max_step, args.settle_timeout, 0.010,
+            args.joint_max_step, args.settle_timeout, args.approach_joint_tolerance,
             initial_left_gripper, initial_right_gripper, True, result,
         )
         open_left, open_right = _traverse_grippers(
@@ -260,7 +272,7 @@ def main(argv=None) -> int:
         for plan in plans[:-1]:
             reached_left, reached_right = _traverse_pair(
                 node, reached_left, reached_right, plan["left_joint_target"], plan["right_joint_target"],
-                args.joint_max_step, args.settle_timeout, 0.010,
+                args.joint_max_step, args.settle_timeout, args.approach_joint_tolerance,
                 args.gripper_open, args.gripper_open, True, result,
             )
             reached.append({"clearance_m": plan["clearance_m"], "left": reached_left.tolist(), "right": reached_right.tolist()})

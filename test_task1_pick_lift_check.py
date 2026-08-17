@@ -3,6 +3,8 @@ import unittest
 import numpy as np
 
 from task1_pick_lift_check import (
+    APPROACH_JOINT_TOLERANCE_RAD,
+    CONTACT_MIN_JOINT_RESIDUAL_RAD,
     TASK1_HOLD_HALF_M,
     contact_approach_geometry,
     contact_clearance_schedule,
@@ -12,6 +14,10 @@ from task1_pick_lift_check import (
 
 
 class Task1PickLiftCheckTests(unittest.TestCase):
+    def test_non_contact_approach_tolerance_has_small_feedback_margin(self):
+        self.assertGreater(APPROACH_JOINT_TOLERANCE_RAD, 0.010)
+        self.assertLessOrEqual(APPROACH_JOINT_TOLERANCE_RAD, CONTACT_MIN_JOINT_RESIDUAL_RAD)
+
     def test_contact_schedule_reaches_contact_in_small_steps(self):
         self.assertEqual(contact_clearance_schedule(0.02, 0.01), [0.02, 0.01, 0.0])
         with self.assertRaises(ValueError):

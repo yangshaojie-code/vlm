@@ -49,7 +49,10 @@ MAX_SPINE_STEP = 0.10
 DEFAULT_MAX_LINEAR_SPEED = 0.15
 DEFAULT_MAX_ANGULAR_SPEED = 0.50
 MIN_NAV_LINEAR_SPEED = 0.04
+MIN_NAV_ANGULAR_SPEED = 0.08
 NAV_ALIGN_THRESHOLD = 0.20
+FINAL_YAW_PROGRESS_EPSILON_RAD = 0.01
+FINAL_YAW_STALL_TIMEOUT_SEC = 4.0
 
 
 def wrap_to_pi(value: float) -> float:
@@ -76,7 +79,8 @@ def navigation_command(
     if distance <= position_tolerance:
         if abs(final_yaw_error) <= yaw_tolerance:
             return 0.0, 0.0, "complete"
-        angular = float(np.clip(1.8 * final_yaw_error, -max_angular_speed, max_angular_speed))
+        angular_magnitude = min(max_angular_speed, max(MIN_NAV_ANGULAR_SPEED, 1.8 * abs(final_yaw_error)))
+        angular = math.copysign(float(angular_magnitude), final_yaw_error)
         return 0.0, angular, "final_yaw"
 
     bearing = math.atan2(delta[1], delta[0])
@@ -189,21 +193,38 @@ def locate_pink(node, top_to_center: float = DEFAULT_TOP_TO_CENTER):
     }
 
 
-def load_position_reference(path, node, position_tolerance: float, yaw_tolerance: float):
-    """Load a passed position-stage report and re-express its box in the current base frame."""
+def load_position_reference(
+    path,
+    node,
+    position_tolerance: float,
+    yaw_tolerance: float,
+    *,
+    allow_failed_final_yaw: bool = False,
+):
+    """Load a verified Task 1 station report without re-observing the close box."""
     report_path = Path(path)
     report = json.loads(report_path.read_text(encoding="utf-8"))
     if report.get("mode") != "task1_pink_precontact_check" or report.get("stage") != "position":
         raise ValueError("position-report is not a Task 1 position-stage report")
-    if report.get("status") != "passed" or report.get("navigation_phase") != "complete":
-        raise ValueError("position-report did not complete successfully")
+    status = report.get("status")
+    phase = report.get("navigation_phase")
+    is_passed = status == "passed" and phase == "complete"
+    is_final_yaw_recovery = allow_failed_final_yaw and status == "failed" and phase == "final_yaw"
+    if not is_passed and not is_final_yaw_recovery:
+        raise ValueError("position-report did not complete successfully or qualify for final-yaw recovery")
     if float(report.get("remaining_position_error_m", math.inf)) > float(position_tolerance):
         raise ValueError("position-report exceeds the requested position tolerance")
-    if abs(float(report.get("remaining_yaw_error_rad", math.inf))) > float(yaw_tolerance):
+    if is_passed and abs(float(report.get("remaining_yaw_error_rad", math.inf))) > float(yaw_tolerance):
         raise ValueError("position-report exceeds the requested yaw tolerance")
     center_world = np.asarray(report.get("detection", {}).get("center_world"), dtype=float)
     final_base = np.asarray(report.get("final_base"), dtype=float)
-    if center_world.shape != (3,) or final_base.shape != (3,) or not np.all(np.isfinite([center_world, final_base])):
+    station = np.asarray(report.get("station_target"), dtype=float)
+    if (
+        center_world.shape != (3,)
+        or final_base.shape != (3,)
+        or station.shape != (3,)
+        or not np.all(np.isfinite([center_world, final_base, station]))
+    ):
         raise ValueError("position-report is missing finite target or final base coordinates")
 
     odom = node.sensors.odom
@@ -221,10 +242,12 @@ def load_position_reference(path, node, position_tolerance: float, yaw_tolerance
         "source": str(report_path),
         "center_world": center_world.tolist(),
         "center_base": _world_to_base(node, center_world).tolist(),
+        "station_target": station.tolist(),
         "position_report_final_base": final_base.tolist(),
         "current_base": current_base.tolist(),
         "base_drift_position_m": drift_position,
         "base_drift_yaw_rad": drift_yaw,
+        "recovery_from_failed_final_yaw": bool(is_final_yaw_recovery),
     }
 
 
@@ -337,6 +360,9 @@ def _navigate(
     previous = start_xy
     path_length = 0.0
     deadline = time.monotonic() + timeout
+    final_yaw_entered_at = None
+    final_yaw_min_abs_error = math.inf
+    final_yaw_last_progress_at = None
     while time.monotonic() < deadline:
         node.spin_once(0.05)
         odom = node.sensors.odom
@@ -367,6 +393,31 @@ def _navigate(
             "remaining_yaw_error_rad": yaw_error,
             "navigation_phase": phase,
         })
+        now = time.monotonic()
+        if phase == "final_yaw":
+            if final_yaw_entered_at is None:
+                final_yaw_entered_at = now
+                final_yaw_last_progress_at = now
+                result["final_yaw_diagnostics"] = {
+                    "entered_at_monotonic": final_yaw_entered_at,
+                    "initial_error_rad": yaw_error,
+                    "min_abs_error_rad": abs(yaw_error),
+                    "last_error_rad": yaw_error,
+                }
+            if abs(yaw_error) <= final_yaw_min_abs_error - FINAL_YAW_PROGRESS_EPSILON_RAD:
+                final_yaw_min_abs_error = abs(yaw_error)
+                final_yaw_last_progress_at = now
+            diagnostics = result["final_yaw_diagnostics"]
+            diagnostics["min_abs_error_rad"] = min(diagnostics["min_abs_error_rad"], abs(yaw_error))
+            diagnostics["last_error_rad"] = yaw_error
+            diagnostics["elapsed_sec"] = now - final_yaw_entered_at
+            if now - final_yaw_last_progress_at >= FINAL_YAW_STALL_TIMEOUT_SEC:
+                node.controller.stop_base()
+                diagnostics["stalled"] = True
+                raise TimeoutError(
+                    "final yaw made no progress "
+                    f"for {FINAL_YAW_STALL_TIMEOUT_SEC:.1f}s; error={yaw_error:.4f} rad"
+                )
         if phase == "complete":
             node.controller.stop_base()
             result["final_base"] = current_pose.tolist()
@@ -430,15 +481,22 @@ def main(argv=None) -> int:
         node = Ros2MissionNode(node_name="task1_precontact_check")
         node.wait_for_robot_state(timeout_sec=10.0)
         initial_slide = float(node.sensors.joint_vector(["slide_joint"])[0])
-        if args.stage == "approach" and args.position_report:
+        if args.position_report and args.stage in ("position", "approach"):
             located = load_position_reference(
-                args.position_report, node, args.position_tolerance, args.yaw_tolerance,
+                args.position_report,
+                node,
+                args.position_tolerance,
+                args.yaw_tolerance,
+                allow_failed_final_yaw=args.stage == "position",
             )
             result["position_reference_used"] = True
         else:
             located = locate_pink(node, args.top_to_center)
         result["detection"] = located
-        station = station_target(located["center_world"], args.standoff)
+        station = np.asarray(
+            located.get("station_target", station_target(located["center_world"], args.standoff)),
+            dtype=float,
+        )
         result["station_target"] = station.tolist()
         if args.stage == "plan":
             result["status"] = "dry_run"

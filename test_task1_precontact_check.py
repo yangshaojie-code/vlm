@@ -7,6 +7,7 @@ from unittest.mock import patch
 import numpy as np
 
 from task1_precontact_check import (
+    MIN_NAV_ANGULAR_SPEED,
     center_from_surface,
     load_position_reference,
     navigation_command,
@@ -74,11 +75,24 @@ class Task1PrecontactTests(unittest.TestCase):
         )
         self.assertEqual(command, (0.0, 0.0, "complete"))
 
+    def test_final_yaw_uses_minimum_angular_speed_and_error_direction(self):
+        positive = navigation_command(
+            [0.0, 0.0, 0.0], [0.0, 0.0, 0.03],
+            0.05, 0.02, 0.15, 0.50,
+        )
+        negative = navigation_command(
+            [0.0, 0.0, 0.0], [0.0, 0.0, -0.03],
+            0.05, 0.02, 0.15, 0.50,
+        )
+        self.assertEqual(positive, (0.0, MIN_NAV_ANGULAR_SPEED, "final_yaw"))
+        self.assertEqual(negative, (0.0, -MIN_NAV_ANGULAR_SPEED, "final_yaw"))
+
     def test_passed_position_report_is_transformed_using_current_odom(self):
         report = {
             "mode": "task1_pink_precontact_check", "stage": "position", "status": "passed",
             "navigation_phase": "complete", "remaining_position_error_m": 0.04,
             "remaining_yaw_error_rad": -0.04, "final_base": [-1.0, 1.66, np.pi / 2.0],
+            "station_target": [-1.0, 1.66, np.pi / 2.0],
             "detection": {"center_world": [-1.0, 2.20, 0.834]},
         }
         node = SimpleNamespace(sensors=SimpleNamespace(odom=self._odom(-1.0, 1.66, np.pi / 2.0)))
@@ -91,12 +105,36 @@ class Task1PrecontactTests(unittest.TestCase):
             "mode": "task1_pink_precontact_check", "stage": "position", "status": "passed",
             "navigation_phase": "complete", "remaining_position_error_m": 0.04,
             "remaining_yaw_error_rad": 0.04, "final_base": [-1.0, 1.66, np.pi / 2.0],
+            "station_target": [-1.0, 1.66, np.pi / 2.0],
             "detection": {"center_world": [-1.0, 2.20, 0.834]},
         }
         node = SimpleNamespace(sensors=SimpleNamespace(odom=self._odom(-0.8, 1.66, np.pi / 2.0)))
         with patch("task1_precontact_check.Path.read_text", return_value=json.dumps(report)):
             with self.assertRaisesRegex(RuntimeError, "base moved"):
                 load_position_reference("position.json", node, 0.05, 0.05)
+
+    def test_final_yaw_recovery_accepts_only_same_task_finite_target_data(self):
+        report = {
+            "mode": "task1_pink_precontact_check", "stage": "position", "status": "failed",
+            "navigation_phase": "final_yaw", "remaining_position_error_m": 0.02,
+            "remaining_yaw_error_rad": -0.14, "final_base": [-1.0, 1.66, np.pi / 2.0 + 0.14],
+            "station_target": [-1.0, 1.66, np.pi / 2.0],
+            "detection": {"center_world": [-1.0, 2.20, 0.834]},
+        }
+        node = SimpleNamespace(sensors=SimpleNamespace(
+            odom=self._odom(-1.0, 1.66, np.pi / 2.0 + 0.14),
+        ))
+        with patch("task1_precontact_check.Path.read_text", return_value=json.dumps(report)):
+            reference = load_position_reference(
+                "position.json", node, 0.05, 0.05, allow_failed_final_yaw=True,
+            )
+        self.assertTrue(reference["recovery_from_failed_final_yaw"])
+        np.testing.assert_allclose(reference["center_world"], [-1.0, 2.2, 0.834], atol=1e-9)
+
+        report["mode"] = "another_task"
+        with patch("task1_precontact_check.Path.read_text", return_value=json.dumps(report)):
+            with self.assertRaisesRegex(ValueError, "Task 1"):
+                load_position_reference("position.json", node, 0.05, 0.05, allow_failed_final_yaw=True)
 
     def test_move_spine_can_be_requested_during_read_only_planning(self):
         import task1_precontact_check

@@ -1,10 +1,18 @@
 # 文旅搬运项目交接说明
 
-> **最新状态请先读 `CURRENT_STATUS.md`。** 本文件保留早期架构和环境过程，部分“尚未确认”内容已经过时；若有冲突，以 `CURRENT_STATUS.md`、`vlm_pipeline/outputs/ros2_probe.json` 和 `vlm_pipeline/outputs/server_reference/` 为准。
+> **最新状态请先读 `CURRENT_STATUS.md`。** 本文件保留早期架构和环境过程，部分“尚未确认”内容已经过时；若有冲突，以 `CURRENT_STATUS.md`、`vlm_pipeline/outputs/ros2_probe.json` 和 `vlm_pipeline/outputs/server_reference/` 为准。当前联调到首次正式程序跑分的执行顺序见 `INTEGRATION_TO_SCORING_PLAN.md`。
 
-更新时间：2026-08-11
+更新时间：2026-08-17
 
 > 状态同步：`CURRENT_STATUS.md` 和 `vlm_pipeline/COMPETITION_PARAMETERS.md` 是当前权威入口。官方 `MMK2Kdl/ArmKdl` 已接入 `motion_planning.py`，动态 `base_link <- head_camera` 已接入 `head_camera_kinematics.py`，并有 43 个离线回归测试。本文后续保留的 KDL/相机 TODO 属于历史过程；当前真正未完成的是双臂正式动作的真实 Server 联调，`motion_ready=False` 仍是安全门。
+
+## 当前交接重点（2026-08-17）
+
+最近一次站位动作已将底盘位置误差收敛到 `0.024571 m`，但最终 yaw 仍有 `0.139467 rad` 误差，故报告为失败。抓取脚本按设计拒绝使用该报告继续动作。接手者首先修复 `task1_precontact_check.py` 的最终 yaw 收敛，并增加失败站位报告的原地恢复能力。
+
+站位通过后，严格按以下顺序推进：新版官方几何的 Task 1 抱持/抬离/放回、`0.20 m` 带物短搬运、Task 1 货架放置、Task 2/3 独立闭环、固定布局三任务连续闭环、正式执行器 preflight，最后才开始正式程序跑分。完整清单和每阶段通过条件见 `INTEGRATION_TO_SCORING_PLAN.md`。
+
+正式执行器仍不得启用；不得把失败报告传给下一阶段，也不得在失败重试时重置 Server 或物理场景。
 
 这份文档给接手项目的 agent/开发者使用。先读本文件，再读
 `vlm_pipeline/README.md` 和 `vlm_pipeline/ROS2_INTEGRATION_LOG.md`，最后运行离线测试。

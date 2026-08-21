@@ -1,0 +1,353 @@
+{
+  "mode": "task1_bimanual_hug_shelf_place_check",
+  "apply": true,
+  "formal_motion_stays_disabled": true,
+  "box_contact_commanded": true,
+  "base_motion_commanded": true,
+  "transport_or_place_commanded": true,
+  "gripper_open_target": 1.0,
+  "approach_half_m": 0.13,
+  "hold_half_m": 0.115,
+  "grasp_fwd_offset_m": 0.065,
+  "grasp_z_offset_m": 0.045,
+  "lift_height_m": 0.1,
+  "table_leave_distance_m": 0.22,
+  "table_leave_min_traveled_m": 0.2,
+  "place_world": [
+    -2.68,
+    0.778,
+    1.156
+  ],
+  "place_radius_m": 0.24,
+  "place_yaw_rad": -3.141592653589793,
+  "place_clearance_m": 0.055,
+  "release_spread_m": 0.04,
+  "staging_back_m": 0.5,
+  "shelf_retreat_m": 0.32,
+  "published_control_topics": [
+    "/cmd_vel",
+    "/spine_forward_position_controller/commands",
+    "/left_arm_forward_position_controller/commands",
+    "/right_arm_forward_position_controller/commands"
+  ],
+  "phase": "shelf_retreat",
+  "resumed": true,
+  "resume_from": "/workspace/baseline/outputs/task1_shelf_place_resume.json",
+  "initial_base": [
+    -1.6704676478141778,
+    0.7933404315423321,
+    -3.073386046196835
+  ],
+  "place_stand_xy": [
+    -2.116642225741366,
+    0.7603138680459071
+  ],
+  "staging_pose": [
+    -1.6166422257413662,
+    0.7603138680459072,
+    -3.141592653589793
+  ],
+  "held_center_base_after_lift": [
+    0.563357774258634,
+    -0.017686131954093007,
+    1.2109999999999999
+  ],
+  "hold_joint_targets": {
+    "left": [
+      7.549272780233903e-09,
+      -1.0295065506755456,
+      0.548518267972415,
+      -1.526341744199902,
+      -1.2463631566939894,
+      1.5996619766739983
+    ],
+    "right": [
+      -8.53974807935995e-09,
+      -0.8762748738640163,
+      0.5253116844384538,
+      1.5239022933758857,
+      1.1164731875268863,
+      -1.5932493932611105
+    ]
+  },
+  "lift_completed": true,
+  "table_leave_completed": true,
+  "contact_slide": 0.44420405186286127,
+  "lift_slide": 0.3442040518628613,
+  "initial_slide": 0.006062766251318734,
+  "shelf_raise_completed": true,
+  "held_center_base_at_clearance": [
+    0.563357774258634,
+    -0.017686131954093007,
+    1.2109999999999999
+  ],
+  "shelf_approach_raw_gripper_feedback": [
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    },
+    {
+      "left": 0.9973386733359517,
+      "right": 0.9972115979810072
+    }
+  ],
+  "shelf_approach_contact_feedback": {
+    "left_max_joint_residual_rad": 0.015494815647219218,
+    "right_max_joint_residual_rad": 0.015214221095045888,
+    "target_reached": false,
+    "symmetric_contact": true,
+    "holding": true
+  },
+  "shelf_approach_estimated_place_world": [
+    -2.4420955557406305,
+    0.7583572686866044,
+    1.2109999999999999
+  ],
+  "shelf_approach_xy_error_m": 0.23871397422817492,
+  "shelf_approach_phase": "translate",
+  "shelf_approach_remaining_m": 0.2407461838801866,
+  "shelf_approach_traveled_m": 0.20665525006158844,
+  "shelf_approach_cross_track_m": 6.169706540087166e-07,
+  "shelf_approach_yaw_error_rad": 1.3339108213550332e-06,
+  "shelf_approach_max_cross_track_m": 6.169706540087166e-07,
+  "shelf_approach_accepted_inside_radius": true,
+  "place_final_base": [
+    -1.878842279902686,
+    0.7791064455127821,
+    -3.0733873796159137
+  ],
+  "shelf_approach_completed": true,
+  "place_slide": 0.13283826848523783,
+  "spine_waypoint_count": 2,
+  "lift_contact_feedback": {
+    "left_max_joint_residual_rad": 0.016757957449281546,
+    "right_max_joint_residual_rad": 0.014157181584329881,
+    "target_reached": false,
+    "symmetric_contact": false,
+    "holding": true
+  },
+  "estimated_place_world": [
+    -2.446257836539078,
+    0.7580733805791,
+    1.156
+  ],
+  "place_xy_error_m": 0.23459000221863202,
+  "place_z_error_m": 0.0,
+  "place_within_radius": true,
+  "place_lower_completed": true,
+  "release_plan": {
+    "slide": 0.13847678411346703,
+    "left_target_position": [
+      0.6283577742472592,
+      0.16231386851230134,
+      1.183160397886533
+    ],
+    "right_target_position": [
+      0.6283577742472591,
+      -0.19768613146532973,
+      1.183160397886533
+    ],
+    "left_joint_target": [
+      -1.985423376641507e-09,
+      -0.8566904027718845,
+      0.5237411955575091,
+      -1.5234785032918823,
+      -1.0984791863294752,
+      1.5923011870202204
+    ],
+    "right_joint_target": [
+      2.2912947835429106e-09,
+      -0.7129635994409953,
+      0.5231597275554463,
+      1.519192216186909,
+      0.9555079860651816,
+      -1.5840379997284835
+    ],
+    "left_fk_position": [
+      0.6283577742472592,
+      0.16231386816233742,
+      1.183160397886533
+    ],
+    "right_fk_position": [
+      0.6283577742472592,
+      -0.1976861311153657,
+      1.183160397886533
+    ],
+    "left_fk_error_m": 3.499639189552539e-10,
+    "right_fk_error_m": 3.49964029977574e-10
+  },
+  "waypoint_counts": [
+    4,
+    32
+  ],
+  "released": true,
+  "shelf_retreat_target": [
+    -1.5663124392040828,
+    0.8010371403144271,
+    -3.071564136859033
+  ],
+  "shelf_retreat_raw_gripper_feedback": [
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    },
+    {
+      "left": 0.9973135335471288,
+      "right": 0.9971780401705752
+    }
+  ],
+  "shelf_retreat_phase": "translate",
+  "shelf_retreat_remaining_m": 0.047608980846305576,
+  "shelf_retreat_traveled_m": 0.2723910191588225,
+  "shelf_retreat_cross_track_m": 6.987665065495696e-07,
+  "shelf_retreat_yaw_error_rad": 4.2009314560331745e-07,
+  "shelf_retreat_max_cross_track_m": 7.018650290402384e-07,
+  "status": "failed",
+  "error": "shelf_retreat timed out; final=[-1.6138047795794443, 0.7977065753631469, -3.0715645569521786]",
+  "arms_retracted": true,
+  "finished_at": "2026-08-21T07:55:07+0000"
+}

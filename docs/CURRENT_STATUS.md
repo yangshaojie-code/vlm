@@ -1,6 +1,6 @@
 # 文旅搬运项目当前状态
 
-更新时间：2026-08-17  
+更新时间：2026-08-21  
 项目目录：`D:\taozhanbei\vlm_pipeline`
 
 这是最新交接入口。旧的 `AGENT_HANDOFF.md` 和 `vlm_pipeline/ROS2_INTEGRATION_LOG.md` 保留历史过程；若内容冲突，以本文件和 `vlm_pipeline/outputs` 中的真实采集结果为准。
@@ -12,21 +12,18 @@
 
 正式 ROS 2 协议、固定布局任务、RGB-D 格式、控制话题、场景尺寸、裁判阈值、官方运动学源码和机器人 MJCF 已经取得。已确认的正式参数集中在 `vlm_pipeline/COMPETITION_PARAMETERS.md`。
 
-当前仍不能运行真实抓放，但阻塞项已收敛为动作联调：
+当前阻塞项已收敛为 **Task 3 黄箱桌顶→货架包装箱左侧**。Task 1 货架放置和 Task 2 货架→桌面均已通过。正式执行器仍不得启用：
 
 1. `motion_planning.py` 已使用项目内的官方 NumPy `MMK2Kdl/ArmKdl`，不再引用不存在的 `discoverse.robots.MMK2IK`；单臂、双臂 FK→IK→FK 和关节限位测试已通过。
-2. `head_camera_kinematics.py` 已根据 MJCF 和实时 slide/head JointState 注入 `base_link <- head_camera`；静态相机矩阵仅保留调试覆盖。仍须在真实固定布局中用 RGB-D 投影验证坐标轴和绝对误差。
-3. `ros_mission_executor.py` 仍是安全禁用的单臂闭爪基线，尚未完成并验证正式的双臂 hug、搬离、放置、回结束区状态机；不得绕过 `motion_ready=False` 发送正式动作。
+2. `head_camera_kinematics.py` 已根据 MJCF 和实时 slide/head JointState 注入 `base_link <- head_camera`；静态相机矩阵仅保留调试覆盖。
+3. `ros_mission_executor.py` 仍是安全禁用的单臂闭爪基线；不得绕过 `motion_ready=False` 发送正式动作。
 
-### 1.1 最近一次真实联调状态（2026-08-17）
+### 1.1 最近一次真实联调状态（2026-08-21）
 
-- Server 重启后已重新从固定布局初始状态开始。
-- 最新粉色方块站位尝试位置误差为 `0.024571 m`，但最终朝向误差为 `-0.139467 rad`，报告为 `status=failed`。
-- `task1_pick_lift_check.py` 正确拒绝了该失败站位报告，没有继续发布抓取动作。
-- 当前 P0 是修复 `task1_precontact_check.py` 的 `final_yaw` 收敛，并支持从失败的站位报告恢复原地朝向校准。
-- 站位通过后，必须重新运行新版 Task 1 抱持/抬离验证，再运行 `0.20 m` 带物搬运；不得复用失败报告。
-- 新版校准参数为：`approach_half=0.130 m`、`hold_half=0.115 m`、`grasp_fwd=+0.065 m`、`grasp_z=+0.045 m`、`gripper_open=1.0`。
-- 夹爪端点反馈异常已改为诊断并裁剪命令值；原始反馈应保存在搬运报告中。
+- **P3 货架放置 passed**（本局重跑后粉箱在 L3）。
+- **P4 Task 2 真实通过**（2026-08-21 09:42:32Z）。棕箱在桌面原粉箱槽附近，估计 `[-0.984, 2.275, 0.834]`，XY 误差 `0.076 m`（半径 `0.28 m`）。松手后收臂、倒车 `0.22 m`。粉箱仍在 L3，黄箱仍在白色方块顶。不要重启 Server。
+- **当前任务：Task 3。** 黄箱从桌面白色方块顶放到货架包装箱左侧 `[-2.68, 0.54, 0.498]`，半径 `0.24 m`。
+- `motion_ready=False` 仍是安全门。联调 `status=passed` 不等于本局 `/referee/score` 一定入账（600 s 可能已过）。
 
 ## 2. 正式比赛约束
 
@@ -202,12 +199,13 @@ ROS Image frame: head_camera
 
 ```text
 python -m unittest discover -v
-Ran 43 tests
+Ran 105 tests
 OK
 ```
 
 仍待完成：
 
+- Task 1 货架放置的首次真实 `--apply`（`task1_shelf_place_check.py` 已写好）。
 - `RosMissionExecutor` 的单臂、固定 top-down 姿态；正式任务一必须改为双臂 hug，任务二/三需要各自的已标定抓放策略。
 - 固定布局下 RGB-D 反投影到已知 pink/yellow/brown 世界坐标的绝对误差与坐标轴验证。
 - 受控真实 Server 动作测试：先单通道控制，再双臂接触/搬离 0.20 m、稳定放置、返回结束区，最后连续三任务与随机布局。
@@ -249,6 +247,8 @@ discoverse_python_files.txt
 3. `test_head_camera_kinematics.py` 覆盖刚体正交性、slide 负 Z 轴和 JointState 适配；仍待真实 RGB-D 投影校验。
 
 ### P1：重写正式动作执行器
+
+当前仍禁止改 `motion_ready`。P3 已通过。当前做 Task 2 独立校准，再 Task 3，最后才把状态机接入 `RosMissionExecutor`。
 
 1. 参考 `official_client_task_1_full.py` 的双臂 hug、slide 和安全倒车流程。
 2. 按任务位置选择桌面侧边、货架和桌面顶部抓取策略，不把固定 pink/brown/yellow 顺序写死。

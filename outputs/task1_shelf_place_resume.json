@@ -1,0 +1,342 @@
+{
+  "mode": "task1_bimanual_hug_shelf_place_check",
+  "apply": true,
+  "formal_motion_stays_disabled": true,
+  "box_contact_commanded": true,
+  "base_motion_commanded": true,
+  "transport_or_place_commanded": true,
+  "gripper_open_target": 1.0,
+  "approach_half_m": 0.13,
+  "hold_half_m": 0.115,
+  "grasp_fwd_offset_m": 0.065,
+  "grasp_z_offset_m": 0.045,
+  "lift_height_m": 0.1,
+  "table_leave_distance_m": 0.22,
+  "table_leave_min_traveled_m": 0.2,
+  "place_world": [
+    -2.68,
+    0.778,
+    1.156
+  ],
+  "place_radius_m": 0.24,
+  "place_yaw_rad": -3.141592653589793,
+  "place_clearance_m": 0.055,
+  "release_spread_m": 0.04,
+  "staging_back_m": 0.5,
+  "shelf_retreat_m": 0.32,
+  "published_control_topics": [
+    "/cmd_vel",
+    "/spine_forward_position_controller/commands",
+    "/left_arm_forward_position_controller/commands",
+    "/right_arm_forward_position_controller/commands"
+  ],
+  "phase": "shelf_approach",
+  "resumed": true,
+  "resume_from": "/workspace/baseline/outputs/task1_shelf_place_official_geometry.json",
+  "initial_base": [
+    -1.5799931107538043,
+    0.7994961047116376,
+    -2.8594660802276914
+  ],
+  "place_stand_xy": [
+    -2.116642225741366,
+    0.7603138680459071
+  ],
+  "staging_pose": [
+    -1.6166422257413662,
+    0.7603138680459072,
+    -3.141592653589793
+  ],
+  "held_center_base_after_lift": [
+    0.563357774258634,
+    -0.017686131954093007,
+    0.9324331281371386
+  ],
+  "hold_joint_targets": {
+    "left": [
+      7.549272780233903e-09,
+      -1.0295065506755456,
+      0.548518267972415,
+      -1.526341744199902,
+      -1.2463631566939894,
+      1.5996619766739983
+    ],
+    "right": [
+      -8.53974807935995e-09,
+      -0.8762748738640163,
+      0.5253116844384538,
+      1.5239022933758857,
+      1.1164731875268863,
+      -1.5932493932611105
+    ]
+  },
+  "lift_completed": true,
+  "table_leave_completed": true,
+  "contact_slide": 0.44420405186286127,
+  "lift_slide": 0.3442040518628613,
+  "initial_slide": 0.006062766251318734,
+  "staging_face_west_contact_feedback": {
+    "left_max_joint_residual_rad": 0.015228797968389607,
+    "right_max_joint_residual_rad": 0.015653202237520092,
+    "target_reached": false,
+    "symmetric_contact": true,
+    "holding": true
+  },
+  "staging_face_west_yaw_error_rad": -0.0913247328932858,
+  "staging_face_west_base": [
+    -1.5799160455202141,
+    0.7995220341993984,
+    -3.0502679206965073
+  ],
+  "staging_face_west_completed": true,
+  "staging_navigation": {
+    "initial_base": [
+      -1.5799160455202141,
+      0.7995220341993984,
+      -3.0502679206965073
+    ],
+    "target": [
+      -1.6166422257413662,
+      0.7603138680459072,
+      -3.141592653589793
+    ],
+    "base_path_length_m": 0.0,
+    "contact_feedback": {
+      "left_max_joint_residual_rad": 0.015228797968389607,
+      "right_max_joint_residual_rad": 0.015653202237520092,
+      "target_reached": false,
+      "symmetric_contact": true,
+      "holding": true
+    },
+    "last_base": [
+      -1.5799160455202141,
+      0.7995220341993984,
+      -3.0502679206965073
+    ],
+    "remaining_position_error_m": 0.05372236598248734,
+    "remaining_yaw_error_rad": -0.0913247328932858,
+    "navigation_phase": "complete",
+    "final_base": [
+      -1.5799160455202141,
+      0.7995220341993984,
+      -3.0502679206965073
+    ]
+  },
+  "staging_final_base": [
+    -1.5799160455202141,
+    0.7995220341993984,
+    -3.0502679206965073
+  ],
+  "staging_completed": true,
+  "place_clearance_slide": 0.07173920220857505,
+  "spine_waypoint_count": 3,
+  "lift_contact_feedback": {
+    "left_max_joint_residual_rad": 0.015073134038030345,
+    "right_max_joint_residual_rad": 0.015207230331096389,
+    "target_reached": false,
+    "symmetric_contact": true,
+    "holding": true
+  },
+  "held_center_base_at_clearance": [
+    0.563357774258634,
+    -0.017686131954093007,
+    1.2109999999999999
+  ],
+  "shelf_raise_completed": true,
+  "shelf_approach_raw_gripper_feedback": [
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    },
+    {
+      "left": 0.9924020239314254,
+      "right": 0.9651789541797173
+    }
+  ],
+  "shelf_approach_contact_feedback": {
+    "left_max_joint_residual_rad": 0.015413014271542513,
+    "right_max_joint_residual_rad": 0.015523373680609964,
+    "target_reached": false,
+    "symmetric_contact": true,
+    "holding": true
+  },
+  "shelf_approach_phase": "translate",
+  "shelf_approach_remaining_m": 0.1666511999423247,
+  "shelf_approach_traveled_m": 0.37173032126326405,
+  "shelf_approach_cross_track_m": 5.1315675640428715e-06,
+  "shelf_approach_yaw_error_rad": 7.10078398302727e-07,
+  "shelf_approach_max_cross_track_m": 5.1315675640428715e-06,
+  "shelf_approach_gripper_endpoint_warning": true,
+  "status": "failed",
+  "error": "shelf_approach timed out; final=[-1.950570715258924, 0.7742018429989654, -3.0733755391367796]",
+  "recovery_retreat_raw_gripper_feedback": [
+    {
+      "left": 0.9973386566924285,
+      "right": 0.9816218224320953
+    },
+    {
+      "left": 0.9973386566924285,
+      "right": 0.9816218224320953
+    },
+    {
+      "left": 0.9973386566924285,
+      "right": 0.9816218224320953
+    },
+    {
+      "left": 0.9973386566924285,
+      "right": 0.9816218224320953
+    },
+    {
+      "left": 0.9973386566924285,
+      "right": 0.9816218224320953
+    },
+    {
+      "left": 0.9973386566924285,
+      "right": 0.9816218224320953
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    },
+    {
+      "left": 0.9975158622142093,
+      "right": 0.9813078836920617
+    }
+  ],
+  "recovery_retreat_contact_feedback": {
+    "left_max_joint_residual_rad": 0.015419251901191533,
+    "right_max_joint_residual_rad": 0.015516607088730039,
+    "target_reached": false,
+    "symmetric_contact": true,
+    "holding": true
+  },
+  "recovery_retreat_phase": "translate",
+  "recovery_retreat_remaining_m": 0.048146437381249234,
+  "recovery_retreat_traveled_m": 0.27633431331159325,
+  "recovery_retreat_cross_track_m": 1.0368717388437032e-06,
+  "recovery_retreat_yaw_error_rad": 2.096931440487282e-06,
+  "recovery_retreat_max_cross_track_m": 1.0667187391420752e-06,
+  "recovery_shelf_retreat_error": "recovery_retreat timed out; final=[-1.674879194505864, 0.7930389897927351, -3.07337763606822]",
+  "recovery_kept_hold": true,
+  "finished_at": "2026-08-21T07:43:48+0000"
+}

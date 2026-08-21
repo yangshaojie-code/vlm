@@ -2,15 +2,17 @@
 
 > **最新状态请先读 `CURRENT_STATUS.md`。** 本文件保留早期架构和环境过程，部分“尚未确认”内容已经过时；若有冲突，以 `CURRENT_STATUS.md`、`vlm_pipeline/outputs/ros2_probe.json` 和 `vlm_pipeline/outputs/server_reference/` 为准。当前联调到首次正式程序跑分的执行顺序见 `INTEGRATION_TO_SCORING_PLAN.md`。
 
-更新时间：2026-08-17
+更新时间：2026-08-21
 
 > 状态同步：`CURRENT_STATUS.md` 和 `vlm_pipeline/COMPETITION_PARAMETERS.md` 是当前权威入口。官方 `MMK2Kdl/ArmKdl` 已接入 `motion_planning.py`，动态 `base_link <- head_camera` 已接入 `head_camera_kinematics.py`，并有 43 个离线回归测试。本文后续保留的 KDL/相机 TODO 属于历史过程；当前真正未完成的是双臂正式动作的真实 Server 联调，`motion_ready=False` 仍是安全门。
 
-## 当前交接重点（2026-08-17）
+## 当前交接重点（2026-08-21）
 
-最近一次站位动作已将底盘位置误差收敛到 `0.024571 m`，但最终 yaw 仍有 `0.139467 rad` 误差，故报告为失败。抓取脚本按设计拒绝使用该报告继续动作。接手者首先修复 `task1_precontact_check.py` 的最终 yaw 收敛，并增加失败站位报告的原地恢复能力。
+P0 站位、P1 官方几何抱持/抬离、P2 桌边短搬运、P3 货架放置、P4 棕箱货架→桌面均已通过。`motion_ready=False` 仍是安全门。接手者当前任务是 **Task 3**：黄箱从桌面白色方块顶放到货架包装箱左侧。不要为刷分重启 Server；粉箱在 L3，棕箱已在桌上。
 
-站位通过后，严格按以下顺序推进：新版官方几何的 Task 1 抱持/抬离/放回、`0.20 m` 带物短搬运、Task 1 货架放置、Task 2/3 独立闭环、固定布局三任务连续闭环、正式执行器 preflight，最后才开始正式程序跑分。完整清单和每阶段通过条件见 `INTEGRATION_TO_SCORING_PLAN.md`。
+粉色箱在 `outputs/task1_transport_official_geometry.json`（04:29:50Z）通过后已放回桌面。P3 复用该抱持几何：接触在 `0.01 m`，朝北倒退离开桌边（应走满 `0.20 m`），转到朝西，经货架中转位进柜，只动升降落到 `place_world=[-2.68, 0.778, 1.156]`，外展松开后倒出再收臂。完整顺序和 Client 命令见 `INTEGRATION_TO_SCORING_PLAN.md`。
+
+P2 评分缺口：脚本在剩余 `0.03 m` 停，外移约 `0.17 m`；P3 离开桌边时收紧。夹爪反馈略超 `1.0` 只记 warning。
 
 正式执行器仍不得启用；不得把失败报告传给下一阶段，也不得在失败重试时重置 Server 或物理场景。
 

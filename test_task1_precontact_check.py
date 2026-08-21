@@ -11,6 +11,8 @@ from task1_precontact_check import (
     center_from_surface,
     load_position_reference,
     navigation_command,
+    observe_backup_sufficient,
+    should_backup_to_observe,
     station_target,
     validate_approach_geometry,
 )
@@ -27,6 +29,14 @@ class Task1PrecontactTests(unittest.TestCase):
     def test_station_target_matches_fixed_task1_geometry(self):
         target = station_target([-1.0, 2.2, 0.834])
         np.testing.assert_allclose(target, [-1.0, 1.66, np.pi / 2.0], atol=1e-9)
+
+    def test_backup_to_observe_only_when_already_near_the_table(self):
+        self.assertTrue(should_backup_to_observe([-0.99, 1.64, np.pi / 2.0]))
+        self.assertFalse(should_backup_to_observe([-0.70, 0.55, np.pi / 2.0]))
+
+    def test_partial_slow_backup_is_enough_to_reobserve(self):
+        self.assertTrue(observe_backup_sufficient(0.267, 0.35))
+        self.assertFalse(observe_backup_sufficient(0.10, 0.35))
 
     def test_center_ray_compensation(self):
         surface = np.array([0.0, 0.08, 0.08])
@@ -130,6 +140,16 @@ class Task1PrecontactTests(unittest.TestCase):
             )
         self.assertTrue(reference["recovery_from_failed_final_yaw"])
         np.testing.assert_allclose(reference["center_world"], [-1.0, 2.2, 0.834], atol=1e-9)
+
+        last_base_only = dict(report)
+        last_base_only.pop("final_base")
+        last_base_only["last_base"] = [-1.0, 1.66, np.pi / 2.0 + 0.14]
+        last_base_only["mode"] = "task1_pink_precontact_check"
+        with patch("task1_precontact_check.Path.read_text", return_value=json.dumps(last_base_only)):
+            reference = load_position_reference(
+                "position.json", node, 0.05, 0.05, allow_failed_final_yaw=True,
+            )
+        np.testing.assert_allclose(reference["position_report_final_base"], last_base_only["last_base"], atol=1e-9)
 
         report["mode"] = "another_task"
         with patch("task1_precontact_check.Path.read_text", return_value=json.dumps(report)):

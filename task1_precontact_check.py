@@ -53,10 +53,31 @@ MIN_NAV_ANGULAR_SPEED = 0.08
 NAV_ALIGN_THRESHOLD = 0.20
 FINAL_YAW_PROGRESS_EPSILON_RAD = 0.01
 FINAL_YAW_STALL_TIMEOUT_SEC = 4.0
+OBSERVE_BACKUP_M = 0.25
+OBSERVE_BACKUP_NEAR_Y = 1.15
+OBSERVE_BACKUP_TIMEOUT_SEC = 40.0
+OBSERVE_BACKUP_SPEED = 0.12
+OBSERVE_BACKUP_MIN_M = 0.18
+MAX_OBSERVE_BACKUP_ATTEMPTS = 3
 
 
 def wrap_to_pi(value: float) -> float:
     return (float(value) + math.pi) % (2.0 * math.pi) - math.pi
+
+
+def should_backup_to_observe(current_pose) -> bool:
+    """True when the base is already near the table and the close box may be out of view."""
+    current = np.asarray(current_pose, dtype=float)
+    if current.shape != (3,) or not np.all(np.isfinite(current)):
+        raise ValueError("current_pose must be a finite [x, y, yaw] vector")
+    return float(current[1]) >= OBSERVE_BACKUP_NEAR_Y
+
+
+def observe_backup_sufficient(traveled, requested=OBSERVE_BACKUP_M) -> bool:
+    """Accept a slower reverse once the camera has likely cleared the table edge."""
+    traveled = float(traveled)
+    requested = float(requested)
+    return traveled >= min(requested - 0.08, OBSERVE_BACKUP_MIN_M)
 
 
 def navigation_command(
@@ -155,6 +176,43 @@ def _yaw_from_odom(odom) -> float:
     return math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
 
 
+def _current_base_pose(node) -> np.ndarray:
+    odom = node.sensors.odom
+    if odom is None:
+        raise RuntimeError("waiting for odometry")
+    pose = odom.pose.pose
+    return np.array([pose.position.x, pose.position.y, _yaw_from_odom(odom)], dtype=float)
+
+
+def _backup_reverse(node, distance, timeout, result):
+    """Reverse straight back so the head camera can see the tabletop box again."""
+    distance = float(distance)
+    start = _current_base_pose(node)[:2]
+    deadline = time.monotonic() + float(timeout)
+    traveled = 0.0
+    result["observe_backup_requested_m"] = distance
+    while time.monotonic() < deadline:
+        node.spin_once(0.05)
+        current = _current_base_pose(node)[:2]
+        traveled = float(np.linalg.norm(current - start))
+        result["observe_backup_traveled_m"] = traveled
+        if observe_backup_sufficient(traveled, distance):
+            node.controller.stop_base()
+            result["published_control_topics"] = list(dict.fromkeys(
+                result["published_control_topics"] + ["/cmd_vel"]
+            ))
+            return traveled
+        node.controller.publish_velocity(-OBSERVE_BACKUP_SPEED, 0.0)
+        result["published_control_topics"] = list(dict.fromkeys(
+            result["published_control_topics"] + ["/cmd_vel"]
+        ))
+    node.controller.stop_base()
+    result["observe_backup_partial"] = True
+    if observe_backup_sufficient(traveled, distance):
+        return traveled
+    raise TimeoutError(f"observe backup timed out; traveled={traveled:.4f} m")
+
+
 def _world_to_base(node, world_point) -> np.ndarray:
     odom = node.sensors.odom
     if odom is None:
@@ -217,7 +275,8 @@ def load_position_reference(
     if is_passed and abs(float(report.get("remaining_yaw_error_rad", math.inf))) > float(yaw_tolerance):
         raise ValueError("position-report exceeds the requested yaw tolerance")
     center_world = np.asarray(report.get("detection", {}).get("center_world"), dtype=float)
-    final_base = np.asarray(report.get("final_base"), dtype=float)
+    recorded_base = report.get("final_base", report.get("last_base"))
+    final_base = np.asarray(recorded_base, dtype=float)
     station = np.asarray(report.get("station_target"), dtype=float)
     if (
         center_world.shape != (3,)
@@ -272,7 +331,13 @@ def _wait_pair(node, left_target, right_target, timeout, tolerance, stable_sampl
         try:
             last_left, last_right, _lg, _rg = _current_arm_state(node)
         except Exception:
-            continue
+            try:
+                last_left = node.sensors.joint_vector([f"left_arm_joint{i}" for i in range(1, 7)])
+                last_right = node.sensors.joint_vector([f"right_arm_joint{i}" for i in range(1, 7)])
+                if not np.all(np.isfinite(last_left)) or not np.all(np.isfinite(last_right)):
+                    continue
+            except Exception:
+                continue
         error = max(
             float(np.max(np.abs(last_left - left_target))),
             float(np.max(np.abs(last_right - right_target))),
@@ -426,6 +491,8 @@ def _navigate(
         if "/cmd_vel" not in result["published_control_topics"]:
             result["published_control_topics"].append("/cmd_vel")
     node.controller.stop_base()
+    if result.get("last_base") is not None and result.get("final_base") is None:
+        result["final_base"] = result["last_base"]
     raise TimeoutError("base did not reach the requested pre-contact station")
 
 
@@ -491,7 +558,31 @@ def main(argv=None) -> int:
             )
             result["position_reference_used"] = True
         else:
-            located = locate_pink(node, args.top_to_center)
+            try:
+                located = locate_pink(node, args.top_to_center)
+            except RuntimeError as exc:
+                if "no pink box detected" not in str(exc) or args.stage != "position" or not args.apply:
+                    raise
+                last_exc = exc
+                located = None
+                for _attempt in range(MAX_OBSERVE_BACKUP_ATTEMPTS):
+                    current_pose = _current_base_pose(node)
+                    if not should_backup_to_observe(current_pose):
+                        raise last_exc
+                    result.setdefault("observe_backup_from", current_pose.tolist())
+                    result["observe_backup_attempts"] = int(result.get("observe_backup_attempts", 0)) + 1
+                    command_issued = True
+                    _backup_reverse(node, OBSERVE_BACKUP_M, OBSERVE_BACKUP_TIMEOUT_SEC, result)
+                    try:
+                        located = locate_pink(node, args.top_to_center)
+                        result["detection_after_observe_backup"] = True
+                        break
+                    except RuntimeError as retry_exc:
+                        if "no pink box detected" not in str(retry_exc):
+                            raise
+                        last_exc = retry_exc
+                if located is None:
+                    raise last_exc
         result["detection"] = located
         station = np.asarray(
             located.get("station_target", station_target(located["center_world"], args.standoff)),

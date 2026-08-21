@@ -1,0 +1,228 @@
+{
+  "mode": "task2_bimanual_hug_shelf_to_table_check",
+  "apply": true,
+  "formal_motion_stays_disabled": true,
+  "box_contact_commanded": true,
+  "base_motion_commanded": true,
+  "transport_or_place_commanded": true,
+  "gripper_open_target": 1.0,
+  "approach_half_m": 0.1,
+  "hold_half_m": 0.08,
+  "grasp_fwd_offset_m": 0.065,
+  "grasp_z_offset_m": 0.045,
+  "lift_height_m": 0.08,
+  "place_world": [
+    -1.0,
+    2.2,
+    0.834
+  ],
+  "place_radius_m": 0.28,
+  "place_accept_radius_m": 0.18,
+  "place_yaw_rad": 1.5707963267948966,
+  "pick_yaw_rad": -3.141592653589793,
+  "place_clearance_m": 0.12,
+  "release_spread_m": 0.06,
+  "staging_back_m": 0.5,
+  "shelf_retreat_m": 0.32,
+  "table_retreat_m": 0.28,
+  "published_control_topics": [
+    "/left_arm_forward_position_controller/commands",
+    "/right_arm_forward_position_controller/commands",
+    "/spine_forward_position_controller/commands",
+    "/cmd_vel"
+  ],
+  "phase": "release",
+  "pink_l3_must_stay": true,
+  "initial_base": [
+    -1.0627447847408047,
+    1.5788125531681068,
+    1.4987566742479261
+  ],
+  "initial_slide": 0.48171204765281417,
+  "resumed_mid_pick": false,
+  "resumed_table_place": false,
+  "resumed_table_release": true,
+  "detection": {
+    "center_world": [
+      -2.63,
+      0.778,
+      0.837
+    ],
+    "center_base": [
+      -0.9115423481352334,
+      1.5055498007787298,
+      0.835439602768924
+    ],
+    "source": "resume_carry"
+  },
+  "box_world_snapped": [
+    -2.63,
+    0.778,
+    0.837
+  ],
+  "pick_stand": [
+    -1.96,
+    0.7780000000000001,
+    -3.141592653589793
+  ],
+  "staging_pose": [
+    -1.46,
+    0.7780000000000002,
+    -3.141592653589793
+  ],
+  "contact_slide": 0.43963717999999996,
+  "place_lower_completed": true,
+  "place_within_radius": true,
+  "release_plan": {
+    "slide": 0.48171204765281417,
+    "left_target_position": [
+      0.7686251605019435,
+      0.18848340204821168,
+      0.8258220343471857
+    ],
+    "right_target_position": [
+      0.762356199267317,
+      -0.2507476090554201,
+      0.8310390153471857
+    ],
+    "left_joint_target": [
+      0.052566201358374996,
+      -1.104072220223206,
+      1.1363973205664695,
+      -1.4517824254824223,
+      -0.7385130856929929,
+      1.489130390971589
+    ],
+    "right_joint_target": [
+      -0.040445766134574825,
+      -0.9413076882789011,
+      1.1356279527414421,
+      1.4397052174957212,
+      0.576277983693219,
+      -1.475655105709438
+    ],
+    "left_fk_position": [
+      0.7686251605019435,
+      0.18848340223037247,
+      0.8258220343471857
+    ],
+    "right_fk_position": [
+      0.762356199267317,
+      -0.250747609237581,
+      0.8310390153471857
+    ],
+    "left_fk_error_m": 1.821607864549435e-10,
+    "right_fk_error_m": 1.8216089747724595e-10
+  },
+  "waypoint_counts": [
+    7,
+    23,
+    1
+  ],
+  "released": true,
+  "release_raise_slide": 0.4317212189376593,
+  "spine_waypoint_count": 4,
+  "release_raise_completed": true,
+  "table_retreat_target": [
+    -1.0829102281283198,
+    1.2995701046269081,
+    1.4987064406704804
+  ],
+  "table_retreat_raw_gripper_feedback": [
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    },
+    {
+      "left": 0.9973442955026435,
+      "right": 0.9972163846064194
+    }
+  ],
+  "table_retreat_phase": "complete",
+  "table_retreat_remaining_m": 0.05944422681556804,
+  "table_retreat_traveled_m": 0.22055577318805591,
+  "table_retreat_cross_track_m": 6.563908669897367e-07,
+  "table_retreat_yaw_error_rad": 1.2215231702583651e-05,
+  "table_retreat_max_cross_track_m": 9.045429467322008e-07,
+  "table_retreat_final_base": [
+    -1.0786279567096893,
+    1.3588598866571862,
+    1.4986942254387778
+  ],
+  "table_retreat_completed": true,
+  "arms_retracted": true,
+  "status": "passed",
+  "finished_at": "2026-08-21T09:42:32+0000"
+}

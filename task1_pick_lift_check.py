@@ -26,6 +26,7 @@ from task1_bimanual_approach_campaign import (
 )
 from task1_precontact_check import (
     DEFAULT_GRIP_HALF,
+    DEFAULT_POSITION_REPORT_PATH,
     MAX_ARM_STEP,
     MAX_SPINE_STEP,
     _traverse_pair,
@@ -49,6 +50,12 @@ APPROACH_JOINT_TOLERANCE_RAD = 0.015
 # Anything much smaller is still the raised pose, even if a tiny interpolation
 # step happens to fall in the contact residual band.
 MIN_HUG_JOINT_DELTA_FROM_PREGRASP_RAD = 0.30
+# Station yaw / box offset can stall the 0.01 m waypoint before the IK
+# target is reachable.  Residuals in this band mean both palms are already
+# against the box, not that the controllers failed to settle.
+TABLE_BLOCKED_HUG_MAX_RAD = 0.28
+# Early contact is valid at 0.01 m; the 0.02 m pose should still have air.
+TABLE_CONTACT_CLEARANCE_MAX_M = 0.0105
 # Once the box has been lowered back onto the table, the arms can be
 # mechanically displaced by contact/friction while opening out.  This is a
 # recovery/retraction phase, not evidence of failed contact, so use a bounded
@@ -228,6 +235,36 @@ def hug_moved_from_pregrasp(left_current, right_current, left_pregrasp, right_pr
     )
 
 
+def blocked_table_hug_lock(left_current, right_current, left_pregrasp, right_pregrasp, left_plan, right_plan):
+    """Lock the current joints when a slightly offset box blocks an inward waypoint.
+
+    `_traverse_pair` requires 0.015 rad settle.  After a yaw-offset station the
+    0.01 m clearance pose is already inside the box, so both arms stall with a
+    larger residual.  That is a valid hug if they have left pre-grasp and the
+    residual versus the planned pose is still a bounded stall, not a missed IK.
+    """
+    if not hug_moved_from_pregrasp(left_current, right_current, left_pregrasp, right_pregrasp):
+        return None
+    residual = contact_residuals(left_current, right_current, left_plan, right_plan)
+    left_error = residual["left_max_joint_residual_rad"]
+    right_error = residual["right_max_joint_residual_rad"]
+    if not (
+        left_error <= TABLE_BLOCKED_HUG_MAX_RAD
+        and right_error <= TABLE_BLOCKED_HUG_MAX_RAD
+        and max(left_error, right_error) >= CONTACT_MIN_JOINT_RESIDUAL_RAD
+        and min(left_error, right_error) >= CARRY_EMPTY_JOINT_RESIDUAL_RAD
+    ):
+        return None
+    residual["blocked_hug"] = True
+    residual["contact_detected"] = True
+    residual["holding"] = True
+    return {
+        "left": np.asarray(left_current, dtype=float),
+        "right": np.asarray(right_current, dtype=float),
+        "feedback": residual,
+    }
+
+
 def _approach_until_reached_or_contact(
     node, left_start, right_start, left_target, right_target,
     max_step, left_gripper, right_gripper, timeout, tolerance, result,
@@ -317,7 +354,7 @@ def _approach_contact_pair(node, left_target, right_target, left_gripper, right_
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Task 1 bounded contact-and-lift hug check")
-    parser.add_argument("--position-report", required=True)
+    parser.add_argument("--position-report", default=DEFAULT_POSITION_REPORT_PATH)
     parser.add_argument("--position-tolerance", type=float, default=0.05)
     parser.add_argument("--yaw-tolerance", type=float, default=0.05)
     parser.add_argument("--initial-clearance", type=float, default=0.02)
@@ -452,24 +489,38 @@ def main(argv=None) -> int:
                 "/left_arm_forward_position_controller/commands",
                 "/right_arm_forward_position_controller/commands",
             ]))
-            if plan["clearance_m"] > 1e-9:
-                reached_left, reached_right = _traverse_pair(
-                    node, reached_left, reached_right, plan["left_joint_target"], plan["right_joint_target"],
-                    args.joint_max_step, args.settle_timeout, args.approach_joint_tolerance,
-                    args.gripper_open, args.gripper_open, True, result,
-                )
-                waypoint_result = {"contact_detected": False}
-            else:
+            allow_early_contact = plan["clearance_m"] <= TABLE_CONTACT_CLEARANCE_MAX_M
+            try:
                 reached_left, reached_right, waypoint_result = _approach_until_reached_or_contact(
                     node, reached_left, reached_right, plan["left_joint_target"], plan["right_joint_target"],
                     args.joint_max_step, args.gripper_open, args.gripper_open,
                     args.settle_timeout, args.approach_joint_tolerance, result,
+                    allow_early_contact=allow_early_contact,
                 )
+            except TimeoutError as exc:
+                left_now, right_now, _, _ = _current_arm_state_unbounded(node)
+                locked = blocked_table_hug_lock(
+                    left_now, right_now, high_left, high_right,
+                    plan["left_joint_target"], plan["right_joint_target"],
+                )
+                if locked is None:
+                    raise
+                reached_left, reached_right = locked["left"], locked["right"]
+                waypoint_result = locked["feedback"]
+                result["blocked_hug_lock"] = {
+                    "clearance_m": plan["clearance_m"],
+                    "left": reached_left.tolist(),
+                    "right": reached_right.tolist(),
+                    "timeout_error": str(exc),
+                    "left_max_joint_residual_rad": waypoint_result["left_max_joint_residual_rad"],
+                    "right_max_joint_residual_rad": waypoint_result["right_max_joint_residual_rad"],
+                }
             reached.append({
                 "clearance_m": plan["clearance_m"],
                 "left": reached_left.tolist(),
                 "right": reached_right.tolist(),
                 "contact_detected": waypoint_result["contact_detected"],
+                "blocked_hug": bool(waypoint_result.get("blocked_hug")),
             })
             if waypoint_result["contact_detected"]:
                 if not hug_moved_from_pregrasp(reached_left, reached_right, high_left, high_right):

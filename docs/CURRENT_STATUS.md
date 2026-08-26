@@ -287,3 +287,12 @@ kdl_parser_py: NOT INSTALLED
 - 不在失败重试时重启 Server 或清除碰撞记录。
 - 不把官方 GT/perception 服务当成正式唯一感知路径，除非赛题明确允许随提交 Client 使用。
 - 不修改 `outputs/server_reference` 中的官方参考原件；正式实现复制到源码模块并保留来源说明。
+
+## 14. 2026-08-22 晚间实测更新
+
+- 本局 Server 未重启，物理状态连续保持：Task 1 站位 passed（位置误差 0.0249 m、yaw 误差 0.0485 rad）。
+- Task 1（粉箱→货架 L3，`task1_shelf_place_check.py`）与 Task 2（棕箱→桌面原槽位，`task2_shelf_to_table_check.py`）已在真实 Server 上完整跑通。
+- 期间一次 pick_lift 报 `paired arms did not settle`，属双臂在 0.02 m 接近位被箱体阻挡的停滞；`blocked_hug_lock` 机制可恢复，后续运行通过。
+- 新增 `task3_cube_top_shelf_place_check.py` 与 `test_task3_cube_top_shelf_place_check.py`：黄箱（白方体顶部 `[-0.54, 2.30, 1.004]`）抱持→抬离 0.10 m→倒退→面向西→货架 staging→降柱至 L1（place `[-2.68, 0.54, 0.498]`，包装盒左侧）→放置→撤臂，含 mid-run 抱持恢复与 vision/固定布局回退。主机全量回归 144 tests OK。
+- Task 3 首跑风险点：L1 放置需 slide 降至约 0.78（限位 0.87），为迄今最深降柱；黄箱目标格与包装盒边缘仅约 0.07 m，接近线横向偏差需受控。
+- 下一步：当前局先 task3 dry-run（无 `--apply`）核对 slide 链与站位，再 `--apply`；passed 后进入固定布局三任务连续闭环（P5），随后 P6 接入 `RosMissionExecutor`、P7 首次固定布局跑分。

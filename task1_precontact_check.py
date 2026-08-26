@@ -48,6 +48,10 @@ MAX_ARM_STEP = 0.08
 MAX_SPINE_STEP = 0.10
 DEFAULT_MAX_LINEAR_SPEED = 0.15
 DEFAULT_MAX_ANGULAR_SPEED = 0.50
+# P0 and P1 must share this path.  P0's argparse --output default used to be
+# /tmp/task1_precontact_check.json, so a successful station after restart never
+# updated the file P1 actually reads.
+DEFAULT_POSITION_REPORT_PATH = "/workspace/baseline/outputs/task1_precontact_position_fixed.json"
 MIN_NAV_LINEAR_SPEED = 0.04
 MIN_NAV_ANGULAR_SPEED = 0.08
 NAV_ALIGN_THRESHOLD = 0.20
@@ -294,8 +298,13 @@ def load_position_reference(
     drift_position = float(np.linalg.norm(current_base[:2] - final_base[:2]))
     drift_yaw = abs(wrap_to_pi(current_base[2] - final_base[2]))
     if drift_position > 0.08 or drift_yaw > 0.08:
+        report_time = report.get("finished_at", "unknown")
         raise RuntimeError(
-            f"base moved since position report: position drift={drift_position:.4f} m, yaw drift={drift_yaw:.4f} rad"
+            "base moved since position report: "
+            f"position drift={drift_position:.4f} m, yaw drift={drift_yaw:.4f} rad; "
+            f"report_finished_at={report_time}; "
+            f"report_final_base={final_base.tolist()}; current_base={current_base.tolist()}. "
+            "After a Server restart, re-run P0 without --position-report and write --output to this same path."
         )
     return {
         "source": str(report_path),
@@ -518,7 +527,7 @@ def main(argv=None) -> int:
     parser.add_argument("--hold-seconds", type=float, default=1.0)
     parser.add_argument("--move-spine", action="store_true", help="approach-stage only: move spine to box height")
     parser.add_argument("--apply", action="store_true", help="required before any base/spine/arm command")
-    parser.add_argument("--output", default="/tmp/task1_precontact_check.json")
+    parser.add_argument("--output", default=DEFAULT_POSITION_REPORT_PATH)
     args = parser.parse_args(argv)
     if args.stage == "plan" and args.apply:
         parser.error("plan stage is read-only and cannot use --apply")

@@ -1,0 +1,85 @@
+{
+  "mode": "task3_bimanual_hug_cube_top_shelf_place_check",
+  "apply": true,
+  "formal_motion_stays_disabled": true,
+  "box_contact_commanded": true,
+  "base_motion_commanded": true,
+  "transport_or_place_commanded": true,
+  "gripper_open_target": 1.0,
+  "approach_half_m": 0.13,
+  "hold_half_m": 0.115,
+  "grasp_fwd_offset_m": 0.065,
+  "grasp_z_offset_m": 0.045,
+  "lift_height_m": 0.1,
+  "table_leave_distance_m": 0.22,
+  "table_leave_min_traveled_m": 0.2,
+  "place_world": [
+    -2.68,
+    0.54,
+    0.498
+  ],
+  "place_radius_m": 0.24,
+  "place_accept_radius_m": 0.08,
+  "place_yaw_rad": -3.141592653589793,
+  "grasp_yaw_rad": 1.5707963267948966,
+  "standoff_m": 0.54,
+  "place_clearance_m": 0.055,
+  "release_spread_m": 0.04,
+  "staging_back_m": 0.5,
+  "shelf_retreat_m": 0.32,
+  "published_control_topics": [
+    "/head_forward_position_controller/commands"
+  ],
+  "phase": "detect",
+  "initial_base": [
+    -1.082788693379767,
+    1.3521968854203512,
+    1.4975746829848204
+  ],
+  "initial_slide": 0.03029699375650027,
+  "resumed_transport": false,
+  "resumed_shelf": false,
+  "detection": {
+    "bbox": [
+      569,
+      284,
+      640,
+      380
+    ],
+    "pixel": [
+      604,
+      332
+    ],
+    "depth_m": 0.8585000336170197,
+    "surface_world": [
+      -0.6210030016704016,
+      2.3455710303535104,
+      1.0612311907587415
+    ],
+    "center_world_raw": [
+      -0.6210030016704016,
+      2.4255710303535105,
+      1.004
+    ],
+    "center_world": [
+      -0.6210030016704016,
+      2.4255710303535105,
+      1.004
+    ],
+    "center_base": [
+      1.1042804371315171,
+      -0.38202432478403103,
+      1.002433061435822
+    ],
+    "source": "vision"
+  },
+  "box_world_snapped": [
+    -0.6210030016704016,
+    2.4255710303535105,
+    1.004
+  ],
+  "status": "failed",
+  "error": "station [-0.6210030016704016, 1.8855710303535105, 1.5707963267948966] is not south of the table edge",
+  "failure_phase": "detect",
+  "finished_at": "2026-08-22T11:23:46+0000"
+}

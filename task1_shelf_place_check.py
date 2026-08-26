@@ -90,8 +90,10 @@ DEFAULT_SHELF_TIMEOUT_SEC = 60.0
 DEFAULT_YAW_TIMEOUT_SEC = 40.0
 APPROACH_STALL_SEC = 4.0
 # Scoring radius is 0.24 m. Its room-side edge sits in the air in front of
-# the cabinet (~x=-2.44).  Only stop/lower/release once the box is deeper.
-APPROACH_ACCEPT_RADIUS_M = 0.18
+# the cabinet (~x=-2.44).  A 0.18 m accept stopped on the lip (box x≈-2.50)
+# and the box fell.  Drive to the place stand; only lower if still on-shelf.
+APPROACH_ACCEPT_RADIUS_M = 0.08
+MAX_PLACE_OUTWARD_M = 0.10
 
 
 def validate_place_world(place_world) -> np.ndarray:
@@ -212,8 +214,8 @@ def placement_error(held_world, place_world, place_radius: float = PLACE_RADIUS_
     radius = float(place_radius)
     if held.shape != (3,) or not np.all(np.isfinite(held)):
         raise ValueError("held_world must be a finite 3-vector")
-    if not 0.10 <= radius <= 0.30:
-        raise ValueError("place radius must be within [0.10, 0.30] m")
+    if not 0.06 <= radius <= 0.30:
+        raise ValueError("place radius must be within [0.06, 0.30] m")
     xy_error = float(np.linalg.norm(held[:2] - place[:2]))
     z_error = float(abs(held[2] - place[2]))
     return {
@@ -229,6 +231,26 @@ def box_inside_place_radius(base_pose, held_center_base, place_world, place_radi
     error = placement_error(world, place_world, place_radius)
     error["held_world"] = world.tolist()
     return error
+
+
+def shelf_inward_ok(held_world, place_world, max_outward_m: float = MAX_PLACE_OUTWARD_M) -> dict:
+    """True when the box is not still hanging off the west-facing shelf lip.
+
+    The shelf opens toward +X.  A positive outward offset means the locked
+    center is still toward the room relative to place_world.
+    """
+    held = np.asarray(held_world, dtype=float)
+    place = validate_place_world(place_world)
+    limit = float(max_outward_m)
+    if held.shape != (3,) or not np.all(np.isfinite(held)):
+        raise ValueError("held_world must be a finite 3-vector")
+    if not 0.04 <= limit <= 0.18:
+        raise ValueError("max outward offset must be within [0.04, 0.18] m")
+    outward = float(held[0] - place[0])
+    return {
+        "outward_m": outward,
+        "deep_enough": outward <= limit,
+    }
 
 
 def load_hold_resume(path) -> dict:
@@ -390,18 +412,34 @@ def _drive_line(
         else:
             _command_hug(node, left_joints, right_joints, gripper_open)
         current = _odom_pose(node)
-        if held_center_base is not None and place_world is not None and place_radius is not None:
-            inside = box_inside_place_radius(current, held_center_base, place_world, place_radius)
-            result[f"{key_prefix}_estimated_place_world"] = inside["held_world"]
-            result[f"{key_prefix}_xy_error_m"] = inside["xy_error_m"]
-            if inside["within_radius"]:
-                node.controller.stop_base()
-                result[f"{key_prefix}_accepted_inside_radius"] = True
-                return current
         linear, angular, details = held_line_command(
             current, start_pose, target_pose, direction, position_tolerance, 0.05,
             min_traveled_m=min_traveled_m, max_linear_speed=max_linear_speed,
         )
+        if held_center_base is not None and place_world is not None and place_radius is not None:
+            inside = box_inside_place_radius(current, held_center_base, place_world, place_radius)
+            depth = shelf_inward_ok(inside["held_world"], place_world)
+            result[f"{key_prefix}_estimated_place_world"] = inside["held_world"]
+            result[f"{key_prefix}_xy_error_m"] = inside["xy_error_m"]
+            result[f"{key_prefix}_outward_m"] = depth["outward_m"]
+            # Do not stop on the scoring/accept circle.  That circle's room-side
+            # edge is the shelf lip.  Only finish early once the chassis is also
+            # on the place stand and the box is inward of the lip.
+            if (
+                inside["within_radius"]
+                and depth["deep_enough"]
+                and details["remaining_m"] <= max(float(position_tolerance), 0.05)
+            ):
+                node.controller.stop_base()
+                result[f"{key_prefix}_accepted_inside_radius"] = True
+                result.update({
+                    f"{key_prefix}_phase": details["phase"],
+                    f"{key_prefix}_remaining_m": details["remaining_m"],
+                    f"{key_prefix}_traveled_m": details["traveled_m"],
+                    f"{key_prefix}_cross_track_m": details["cross_track_m"],
+                    f"{key_prefix}_yaw_error_rad": details["yaw_error_rad"],
+                })
+                return current
         max_cross_track = max(max_cross_track, details["cross_track_m"])
         final = current
         result.update({
@@ -898,8 +936,8 @@ def main(argv=None) -> int:
         parser.error("timeout arguments are invalid")
     if not TASK1_HOLD_HALF_M <= args.hold_half <= args.approach_half <= TASK1_APPROACH_HALF_M:
         parser.error("hold-half must be within [0.115, approach-half], and approach-half <= 0.13 m")
-    if not 0.08 <= args.approach_accept_radius <= args.place_radius:
-        parser.error("approach-accept-radius must be within [0.08, place-radius]")
+    if not 0.06 <= args.approach_accept_radius <= args.place_radius:
+        parser.error("approach-accept-radius must be within [0.06, place-radius]")
     place_world = validate_place_world(args.place_world)
     place_yaw = wrap_to_pi(args.place_yaw)
 
@@ -1118,7 +1156,9 @@ def main(argv=None) -> int:
             )
             result["shelf_approach_timeout_estimated_place_world"] = inside["held_world"]
             result["shelf_approach_timeout_xy_error_m"] = inside["xy_error_m"]
-            if not inside["within_radius"]:
+            depth = shelf_inward_ok(inside["held_world"], place_world)
+            result["shelf_approach_timeout_outward_m"] = depth["outward_m"]
+            if not inside["within_radius"] or not depth["deep_enough"]:
                 raise
             result["shelf_approach_accepted_inside_radius"] = True
             result["shelf_approach_timeout_error"] = str(exc)
@@ -1130,10 +1170,13 @@ def main(argv=None) -> int:
         )
         result["pre_lower_estimated_place_world"] = ready["held_world"]
         result["pre_lower_xy_error_m"] = ready["xy_error_m"]
-        if not ready["within_radius"]:
+        pre_lower_depth = shelf_inward_ok(ready["held_world"], place_world)
+        result["pre_lower_outward_m"] = pre_lower_depth["outward_m"]
+        if not ready["within_radius"] or not pre_lower_depth["deep_enough"]:
             raise RuntimeError(
-                f"box is still in front of the shelf (xy error {ready['xy_error_m']:.3f} m); "
-                f"need <= {args.approach_accept_radius:.2f} m before lowering"
+                f"box is still on the shelf lip (xy error {ready['xy_error_m']:.3f} m, "
+                f"outward {pre_lower_depth['outward_m']:.3f} m); "
+                f"need <= {args.approach_accept_radius:.2f} m and inward of {MAX_PLACE_OUTWARD_M:.2f} m"
             )
 
         phase = "place_lower"
@@ -1158,9 +1201,12 @@ def main(argv=None) -> int:
             _odom_pose(node), context["held_center_base"], place_world, args.approach_accept_radius,
         )
         result["pre_release_xy_error_m"] = release_ready["xy_error_m"]
-        if not release_ready["within_radius"]:
+        release_depth = shelf_inward_ok(release_ready["held_world"], place_world)
+        result["pre_release_outward_m"] = release_depth["outward_m"]
+        if not release_ready["within_radius"] or not release_depth["deep_enough"]:
             raise RuntimeError(
-                f"refusing to release in front of the shelf; xy error {release_ready['xy_error_m']:.3f} m"
+                f"refusing to release on the shelf lip; xy error {release_ready['xy_error_m']:.3f} m, "
+                f"outward {release_depth['outward_m']:.3f} m"
             )
         if not error["within_radius"]:
             raise RuntimeError(

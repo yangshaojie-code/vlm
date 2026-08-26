@@ -6,7 +6,10 @@ from task1_pick_lift_check import (
     APPROACH_JOINT_TOLERANCE_RAD,
     CARRY_EMPTY_JOINT_RESIDUAL_RAD,
     CONTACT_MIN_JOINT_RESIDUAL_RAD,
+    TABLE_BLOCKED_HUG_MAX_RAD,
+    TABLE_CONTACT_CLEARANCE_MAX_M,
     TASK1_HOLD_HALF_M,
+    blocked_table_hug_lock,
     classify_approach_sample,
     contact_approach_geometry,
     contact_clearance_schedule,
@@ -135,6 +138,39 @@ class Task1PickLiftCheckTests(unittest.TestCase):
         )
         self.assertTrue(sample["plan_contact"])
         self.assertTrue(hug_moved_from_pregrasp(current_left, current_right, high_left, high_right))
+
+    def test_offset_station_stall_at_one_cm_is_a_blocked_hug(self):
+        self.assertGreater(TABLE_CONTACT_CLEARANCE_MAX_M, 0.01)
+        self.assertLess(TABLE_CONTACT_CLEARANCE_MAX_M, 0.02)
+        high_left = np.array([0.0, 0.0, 0.0, -1.510, -0.766, 1.570])
+        high_right = np.array([0.0, 0.0, 0.0, 1.510, 0.766, -1.570])
+        stalled_left = np.array([0.00140, -0.98844, 0.58383, -1.53108, -1.20272, 1.59764])
+        stalled_right = np.array([-0.00116, -0.89748, 0.57194, 1.52999, 1.12574, -1.59379])
+        plan_left = stalled_left + np.array([0.0, -0.11, 0.06, 0.0, 0.0, 0.0])
+        plan_right = stalled_right + np.array([0.0, -0.09, 0.05, 0.0, 0.0, 0.0])
+        locked = blocked_table_hug_lock(
+            stalled_left, stalled_right, high_left, high_right, plan_left, plan_right,
+        )
+        self.assertIsNotNone(locked)
+        self.assertTrue(locked["feedback"]["blocked_hug"])
+        self.assertTrue(locked["feedback"]["contact_detected"])
+        self.assertGreater(locked["feedback"]["left_max_joint_residual_rad"], APPROACH_JOINT_TOLERANCE_RAD)
+        self.assertLessEqual(locked["feedback"]["left_max_joint_residual_rad"], TABLE_BLOCKED_HUG_MAX_RAD)
+        np.testing.assert_allclose(locked["left"], stalled_left)
+        self.assertIsNone(blocked_table_hug_lock(
+            high_left, high_right, high_left, high_right, plan_left, plan_right,
+        ))
+
+    def test_one_sided_table_stall_is_not_a_blocked_hug(self):
+        high_left = np.zeros(6)
+        high_right = np.zeros(6)
+        hugged_left = np.array([0.0, -0.90, 0.0, 0.0, 0.0, 0.0])
+        hugged_right = np.array([0.0, -0.90, 0.0, 0.0, 0.0, 0.0])
+        plan_left = np.array([0.0, -1.00, 0.0, 0.0, 0.0, 0.0])
+        plan_right = np.array([0.0, -1.50, 0.0, 0.0, 0.0, 0.0])
+        self.assertIsNone(blocked_table_hug_lock(
+            hugged_left, hugged_right, high_left, high_right, plan_left, plan_right,
+        ))
 
 
 if __name__ == "__main__":

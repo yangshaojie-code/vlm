@@ -17,6 +17,7 @@ from task1_shelf_place_check import (
     placement_error,
     pose_offset,
     release_cartesian,
+    shelf_inward_ok,
     slide_for_held_z,
     staging_pose,
     validate_place_world,
@@ -110,37 +111,35 @@ class Task1ShelfPlaceCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "cannot continue"):
                 load_hold_resume("failed.json")
 
-    def test_stuck_in_cabinet_is_ready_to_lower(self):
-        inside_score = box_inside_place_radius(
-            [-1.950570715258924, 0.7742018429989654, -3.0733755391367796],
-            [0.563357774258634, -0.017686131954093007, 1.2109999999999999],
+    def test_lip_placement_is_inside_score_radius_but_not_deep_enough(self):
+        lip = box_inside_place_radius(
+            [-1.9132006236215582, 0.7869170833936325, -3.0722889189243054],
+            [0.5882456679445845, -0.016226957422650207, 1.211],
             INSTRUCTION_PLACE_WORLD,
             0.24,
         )
-        ready = box_inside_place_radius(
-            [-1.950570715258924, 0.7742018429989654, -3.0733755391367796],
-            [0.563357774258634, -0.017686131954093007, 1.2109999999999999],
+        depth = shelf_inward_ok(lip["held_world"], INSTRUCTION_PLACE_WORLD)
+        self.assertTrue(lip["within_radius"])
+        self.assertGreater(depth["outward_m"], 0.10)
+        self.assertFalse(depth["deep_enough"])
+        tight = box_inside_place_radius(
+            [-1.9132006236215582, 0.7869170833936325, -3.0722889189243054],
+            [0.5882456679445845, -0.016226957422650207, 1.211],
             INSTRUCTION_PLACE_WORLD,
-            0.18,
+            0.08,
         )
-        self.assertTrue(inside_score["within_radius"])
-        self.assertTrue(ready["within_radius"])
+        self.assertFalse(tight["within_radius"])
 
-    def test_front_of_cabinet_is_inside_score_radius_but_not_ready_to_release(self):
-        air = box_inside_place_radius(
-            [-1.878842279902686, 0.7791064455127821, -3.0733873796159137],
-            [0.563357774258634, -0.017686131954093007, 1.2109999999999999],
-            INSTRUCTION_PLACE_WORLD,
-            0.24,
-        )
+    def test_place_stand_is_deep_enough_to_lower(self):
+        held = np.array([0.5882456679445845, -0.016226957422650207, 1.211])
+        stand = place_stand_from_goal(INSTRUCTION_PLACE_WORLD, PLACE_YAW, held)
         ready = box_inside_place_radius(
-            [-1.878842279902686, 0.7791064455127821, -3.0733873796159137],
-            [0.563357774258634, -0.017686131954093007, 1.2109999999999999],
-            INSTRUCTION_PLACE_WORLD,
-            0.18,
+            [stand[0], stand[1], PLACE_YAW], held, INSTRUCTION_PLACE_WORLD, 0.08,
         )
-        self.assertTrue(air["within_radius"])
-        self.assertFalse(ready["within_radius"])
+        depth = shelf_inward_ok(ready["held_world"], INSTRUCTION_PLACE_WORLD)
+        self.assertTrue(ready["within_radius"])
+        self.assertTrue(depth["deep_enough"])
+        np.testing.assert_allclose(ready["held_world"][:2], INSTRUCTION_PLACE_WORLD[:2], atol=1e-12)
 
     def test_hold_resume_skips_to_approach_after_raise(self):
         report = {

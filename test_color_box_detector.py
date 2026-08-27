@@ -22,7 +22,7 @@ class ColorBoxDetectorTests(unittest.TestCase):
 
     def test_detects_compact_white_packaging_box(self):
         image = np.full((480, 640, 3), (40, 40, 40), dtype=np.uint8)
-        image[200:280, 310:400] = (240, 240, 238)
+        image[200:280, 310:400] = (180, 182, 190)
         detections = detect_colored_boxes(image, "white", min_area=60)
         self.assertEqual(len(detections), 1)
         self.assertEqual(detections[0].color, "white")

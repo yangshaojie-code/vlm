@@ -71,8 +71,9 @@ def _mask(rgb: np.ndarray, color: str) -> np.ndarray:
         # shelf box has a distinctly more saturated brown front face.
         return (hue >= 12.0) & (hue <= 40.0) & (saturation >= 0.53) & (maximum >= 0.22) & (maximum <= 0.82)
     if color == "white":
-        # Packaging box: bright, low-chroma.  Reject warm wood and saturated boxes.
-        return (saturation <= 0.22) & (maximum >= 0.72)
+        # Packaging box: bright, low-chroma.  Shelf lighting is dimmer than
+        # a synthetic 240-gray patch, so keep a looser value floor.
+        return (saturation <= 0.32) & (maximum >= 0.55)
     raise ValueError(f"不支持的颜色: {color}")
 
 
@@ -102,14 +103,20 @@ def _components(mask: np.ndarray, min_area: int, max_area: int, max_bbox_area: i
             yield x_min, y_min, x_max + 1, y_max + 1, count
 
 
-def detect_colored_boxes(image, color: Optional[str] = None, min_area: int = 80) -> List[BoxDetection]:
+def detect_colored_boxes(
+    image,
+    color: Optional[str] = None,
+    min_area: int = 80,
+    max_area_frac: float = 0.06,
+    max_bbox_frac: float = 0.10,
+) -> List[BoxDetection]:
     rgb = _rgb_array(image)
     colors = [normalize_color(color)] if color is not None else ["pink", "yellow", "brown"]
     image_area = rgb.shape[0] * rgb.shape[1]
     # A rendered box occupies a compact region.  The values are intentionally
     # generous for close views but eliminate table/wall-sized false positives.
-    max_area = max(min_area, int(image_area * 0.06))
-    max_bbox_area = max(min_area, int(image_area * 0.10))
+    max_area = max(min_area, int(image_area * float(max_area_frac)))
+    max_bbox_area = max(min_area, int(image_area * float(max_bbox_frac)))
     min_span = 12
     detections = []
     for name in colors:

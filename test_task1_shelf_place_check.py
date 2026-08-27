@@ -130,6 +130,18 @@ class Task1ShelfPlaceCheckTests(unittest.TestCase):
         )
         self.assertFalse(tight["within_radius"])
 
+    def test_five_cm_short_of_stand_is_still_on_the_lip(self):
+        ready = box_inside_place_radius(
+            [-2.0442169451041003, 0.7774656306580386, -3.0706226893234514],
+            [0.5905773509118286, -0.020556924684844824, 1.211],
+            INSTRUCTION_PLACE_WORLD,
+            0.08,
+        )
+        depth = shelf_inward_ok(ready["held_world"], INSTRUCTION_PLACE_WORLD)
+        self.assertTrue(ready["within_radius"])
+        self.assertGreater(depth["outward_m"], 0.04)
+        self.assertFalse(depth["deep_enough"])
+
     def test_place_stand_is_deep_enough_to_lower(self):
         held = np.array([0.5882456679445845, -0.016226957422650207, 1.211])
         stand = place_stand_from_goal(INSTRUCTION_PLACE_WORLD, PLACE_YAW, held)

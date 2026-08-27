@@ -33,8 +33,6 @@ from task1_pick_lift_check import (
     APPROACH_JOINT_TOLERANCE_RAD,
     RETRACTION_JOINT_TOLERANCE_RAD,
     TASK1_APPROACH_HALF_M,
-    TASK1_GRASP_FWD_OFFSET_M,
-    TASK1_GRASP_Z_OFFSET_M,
     TASK1_HOLD_HALF_M,
     _approach_until_reached_or_contact,
     blocked_table_hug_lock,
@@ -47,10 +45,16 @@ from task1_pick_lift_check import (
 from task1_precontact_check import (
     BOX_HALF_DEPTH,
     MAX_ARM_STEP,
+    MAX_OBSERVE_BACKUP_ATTEMPTS,
     MAX_SPINE_STEP,
+    OBSERVE_BACKUP_M,
+    OBSERVE_BACKUP_TIMEOUT_SEC,
+    _backup_reverse,
     _navigate,
     _traverse_pair,
+    _traverse_spine,
     _world_to_base,
+    should_backup_to_observe,
     station_target,
     wrap_to_pi,
 )
@@ -91,8 +95,7 @@ from task2_shelf_to_table_check import (
     _bind_hold_keeper,
     _traverse_spine_keeping_pose,
     already_carrying_box,
-    held_center_from_palms,
-    inward_hold_from_blocked,
+    center_from_shelf_front,
     local_carry_hold,
 )
 
@@ -109,12 +112,48 @@ PLACE_YAW = math.pi
 GRASP_YAW = math.pi / 2.0
 TASK3_LIFT_HEIGHT_M = 0.10
 TASK3_PLACE_CLEARANCE_M = 0.055
+# Task 3 keeps its own hug offsets.  Task 1's +0.065 m is a front-face
+# compensation; the cube-top center is already reconstructed, so that extra
+# 6.5 cm parks the palms on ~1.5 cm of the far lip and the 0.115 m close
+# goes through air.  Palms at the reconstructed center cover the 0.16 m sides.
+TASK3_GRASP_FWD_OFFSET_M = 0.0
+TASK3_GRASP_Z_OFFSET_M = 0.02
+BOX_HALF_DEPTH_M = 0.08
+# Aisle/south travel stays above the L1 packaging top (~0.65 m).  After the
+# chassis is south of that obstacle, drop onto L1 (z=0.498) before release.
+# Do not insert at 0.82 m: the held bottom sits on the L2 board (0.732 m).
+PACKAGING_WORLD = np.array([-2.63, 0.778, 0.530], dtype=float)
+PACKAGING_HALF_HEIGHT_M = 0.117
+PACKAGING_TOP_Z_M = float(PACKAGING_WORLD[2] + PACKAGING_HALF_HEIGHT_M)
+SHELF_L2_BOARD_Z = 0.732
+# Creep above the L1 packaging box (~z=0.58) and below L3 pink (~z=1.06).
+# A due-west creep on y≈0.54 stalls at x≈-1.83; stay on the proven aisle
+# (y=0.778) until insert x, then shift south and square west into L1.
+TASK3_APPROACH_Z_M = 0.82
 TASK3_RELEASE_SPREAD_M = 0.04
 TASK3_STANDOFF_M = 0.54
+TASK3_HOLD_HALF_M = 0.105
+TASK3_HOLD_SQUEEZE_RAD = 0.05
+SHELF_AISLE_Y_M = 0.778
+APPROACH_STALL_X_M = -1.83
+PLACE_ALIGN_YAW_TOLERANCE_RAD = 0.05
+SOUTH_SHIFT_MIN_M = 0.08
+MAX_HOLD_REFRESH = 1
+# A confirmed squeeze often sits inside 0.105 m (palms on the 0.16 m faces).
+# 0.100 was aborting a working hold; 0.122 still catches an open corner graze.
+MIN_HOLD_HALF_SPAN_M = 0.075
+MAX_HOLD_HALF_SPAN_M = 0.122
+MAX_HOLD_PALM_DZ_M = 0.008
 SHELF_L1_BOARD_Z = 0.403
+SHELF_BOARD_SURFACES_Z = (0.403, 0.732, 1.061, 1.366, 1.695, 2.024)
+OBSTACLE_HALF_Y_M = 0.10
+OBSTACLE_HALF_X_M = 0.09
+PLACE_LEFT_GAP_M = 0.04
+PLACE_SHELF_INSET_M = 0.05
 # The head camera sits ~0.35 m above the yellow box at the observe distance,
 # so a small extra pitch (the body already tilts -0.33) keeps it centered.
 OBSERVE_HEAD = (0.0, -0.10)
+SHELF_OBSERVE_HEAD = (0.0, -0.40)
 TABLE_SOUTH_EDGE_Y = 1.915
 STATION_Y_MAX = TABLE_SOUTH_EDGE_Y - 0.03
 HUG_WINDOW_X = (0.35, 0.75)
@@ -134,16 +173,19 @@ def validate_yellow_world(box_world) -> np.ndarray:
 
 
 def snap_cube_top_center(box_world) -> np.ndarray:
-    """Snap a cube-top detection onto the known fixed-layout yellow cell.
+    """Keep measured Y; snap X/Z and only pull north-biased Y off the table.
 
-    The head camera looks north, so depth noise lands on world Y.  A 12 cm
-    north bias makes station_target sit on the table-edge guard and abort
-    before the hug.  The white cube pose is fixed, so XY and Z are snapped
-    after the detection has been validated in the cube-top window.
+    The head camera looks north, so depth noise lands on world Y.  Forcing
+    every detection onto y=2.30 puts the palms 4 cm behind a slightly south
+    box and the 0.115 m hug closes through air.  A large north bias is still
+    clamped so station_target stays south of the table edge.
     """
     box = validate_yellow_world(box_world).copy()
-    box[:2] = YELLOW_FIXED_WORLD[:2]
+    box[0] = YELLOW_FIXED_WORLD[0]
     box[2] = CUBE_TOP_CENTER_Z
+    max_y = STATION_Y_MAX + TASK3_STANDOFF_M - 0.01
+    if float(box[1]) > max_y:
+        box[1] = float(max_y)
     return box
 
 
@@ -178,10 +220,93 @@ def validate_place_world_l1(place_world) -> np.ndarray:
     return place
 
 
+def held_center_from_palms_l1(slide: float, left_joints, right_joints) -> np.ndarray:
+    """Palm midpoint at Task 3 L1 height; the Task 2 helper rejects z below 0.70 m."""
+    backend = MMK2KdlBackend()
+    left_fk = backend.forward("l", float(slide), np.asarray(left_joints, dtype=float))
+    right_fk = backend.forward("r", float(slide), np.asarray(right_joints, dtype=float))
+    center = 0.5 * (np.asarray(left_fk[:3, 3], dtype=float) + np.asarray(right_fk[:3, 3], dtype=float))
+    center[0] -= TASK3_GRASP_FWD_OFFSET_M
+    if not (0.35 <= center[0] <= 0.85 and abs(center[1]) <= 0.18 and 0.45 <= center[2] <= 1.20):
+        raise ValueError(f"palm midpoint is outside the L1 hold window: {center.tolist()}")
+    return center
+
+
 def lift_clears_cube(box_z: float, lift_height: float, cube_top: float = CUBE_TOP_Z) -> bool:
     """True when a lifted cube-top box bottom clears the cube top with margin."""
     bottom_after_lift = float(box_z) - BOX_HALF_HEIGHT_M + float(lift_height)
     return bottom_after_lift >= float(cube_top) + 0.04
+
+
+def held_bottom_z(held_center_z, half_height: float = BOX_HALF_HEIGHT_M) -> float:
+    """World-z of the held carton bottom from its center height."""
+    return float(held_center_z) - float(half_height)
+
+
+def approach_clears_packaging(
+    held_center_z,
+    packaging_top: float = PACKAGING_TOP_Z_M,
+) -> bool:
+    """True when aisle/south travel flies over the L1 packaging box."""
+    return held_bottom_z(held_center_z) >= float(packaging_top) + 0.04
+
+
+def place_is_l1_layer(place_z, packaging_z: float = float(PACKAGING_WORLD[2])) -> bool:
+    """True when the place height is on the same board as the packaging box."""
+    return abs(float(place_z) - float(packaging_z)) <= 0.05
+
+
+def nearest_shelf_board_z(object_z, half_height: float = PACKAGING_HALF_HEIGHT_M) -> float:
+    """Shelf board the detected obstacle is sitting on."""
+    bottom = float(object_z) - float(half_height)
+    return float(min(SHELF_BOARD_SURFACES_Z, key=lambda board: abs(float(board) - bottom)))
+
+
+def validate_shelf_side_place(place_world) -> np.ndarray:
+    """Accept a shelf cell beside a detected prop, not only the fixed L1 numbers."""
+    place = np.asarray(place_world, dtype=float)
+    if place.shape != (3,) or not np.all(np.isfinite(place)):
+        raise ValueError("place_world must be a finite [x, y, z] vector")
+    if not (-2.95 <= place[0] <= -2.35 and 0.22 <= place[1] <= 1.15 and 0.40 <= place[2] <= 1.25):
+        raise ValueError(f"place_world is outside the shelf side-place window: {place.tolist()}")
+    return place
+
+
+def place_left_of_obstacle(
+    obstacle_world,
+    *,
+    direction: str = "left",
+    box_half_y: float = 0.08,
+    box_half_z: float = BOX_HALF_HEIGHT_M,
+    obstacle_half_y: float = OBSTACLE_HALF_Y_M,
+    gap: float = PLACE_LEFT_GAP_M,
+    inset: float = PLACE_SHELF_INSET_M,
+) -> np.ndarray:
+    """World center that puts the held carton on the obstacle's left, same shelf layer.
+
+    The robot faces west into the cabinet, so left is south (-Y).  Height comes
+    from the board under the detected obstacle, not from a hardcoded L1 z.
+    """
+    obs = np.asarray(obstacle_world, dtype=float)
+    if obs.shape != (3,) or not np.all(np.isfinite(obs)):
+        raise ValueError("obstacle_world must be a finite 3-vector")
+    if direction not in ("left", "right"):
+        raise ValueError("direction must be 'left' or 'right'")
+    board = nearest_shelf_board_z(obs[2])
+    sign = -1.0 if direction == "left" else 1.0
+    place = np.array([
+        float(obs[0]) - float(inset),
+        float(obs[1]) + sign * (float(obstacle_half_y) + float(box_half_y) + float(gap)),
+        float(board) + float(box_half_z),
+    ], dtype=float)
+    return validate_shelf_side_place(place)
+
+
+def approach_z_over_obstacle(obstacle_z, half_height: float = PACKAGING_HALF_HEIGHT_M) -> float:
+    """Held-center height that flies over the detected obstacle, then we lower onto its layer."""
+    top = float(obstacle_z) + float(half_height)
+    held = top + BOX_HALF_HEIGHT_M + 0.08
+    return float(min(max(held, 0.70), 0.95))
 
 
 def station_for_yellow(
@@ -200,7 +325,7 @@ def station_for_yellow(
 
 def place_stand_from_goal(place_world, place_yaw: float, held_center_base) -> np.ndarray:
     """Base xy that puts the held box center onto place_world xy at place_yaw."""
-    place = validate_place_world_l1(place_world)
+    place = validate_shelf_side_place(place_world)
     held = np.asarray(held_center_base, dtype=float)
     yaw = wrap_to_pi(place_yaw)
     if held.shape != (3,) or not np.all(np.isfinite(held)):
@@ -215,10 +340,135 @@ def place_stand_from_goal(place_world, place_yaw: float, held_center_base) -> np
     return np.array([place[0] - held_world[0], place[1] - held_world[1]], dtype=float)
 
 
+def aisle_staging_from_stand(
+    place_stand_xy,
+    place_yaw: float,
+    staging_back: float = STAGING_BACK_M,
+    aisle_y: float = SHELF_AISLE_Y_M,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Stage on the proven shelf-center line instead of the south L1 cell."""
+    stand = np.asarray(place_stand_xy, dtype=float)
+    aisle_y = float(aisle_y)
+    if stand.shape != (2,) or not np.all(np.isfinite(stand)):
+        raise ValueError("place stand must be a finite [x, y] vector")
+    if not 0.70 <= aisle_y <= 0.86:
+        raise ValueError(f"shelf aisle y {aisle_y} is outside the proven insert line")
+    insert_xy = np.array([float(stand[0]), aisle_y], dtype=float)
+    return staging_pose(insert_xy, place_yaw, staging_back), insert_xy
+
+
+def aligned_shelf_insert_plan(
+    place_stand_xy,
+    *,
+    aisle_y: float = SHELF_AISLE_Y_M,
+    place_yaw: float = PLACE_YAW,
+    south_shift_min: float = SOUTH_SHIFT_MIN_M,
+) -> dict:
+    """West along the aisle to insert x, then south to the L1 cell, then square west."""
+    stand = np.asarray(place_stand_xy, dtype=float)
+    aisle_y = float(aisle_y)
+    if stand.shape != (2,) or not np.all(np.isfinite(stand)):
+        raise ValueError("place stand must be a finite [x, y] vector")
+    if not 0.70 <= aisle_y <= 0.86:
+        raise ValueError(f"shelf aisle y {aisle_y} is outside the proven insert line")
+    insert_xy = np.array([float(stand[0]), aisle_y], dtype=float)
+    shift_m = abs(float(stand[1]) - aisle_y)
+    south_bearing = None
+    if shift_m >= float(south_shift_min):
+        south_bearing = approach_bearing(insert_xy, stand)
+    return {
+        "insert_xy": insert_xy,
+        "place_stand_xy": np.array([float(stand[0]), float(stand[1])], dtype=float),
+        "west_yaw": wrap_to_pi(place_yaw),
+        "south_bearing": south_bearing,
+        "needs_south_shift": south_bearing is not None,
+        "south_shift_m": shift_m,
+    }
+
+
+def insert_line_y_at_x(start_xy, goal_xy, query_x: float) -> float:
+    """World y of the straight insert segment at a given x."""
+    start = np.asarray(start_xy, dtype=float)[:2]
+    goal = np.asarray(goal_xy, dtype=float)[:2]
+    if start.shape != (2,) or goal.shape != (2,) or not np.all(np.isfinite(start)) or not np.all(np.isfinite(goal)):
+        raise ValueError("insert segment ends must be finite xy")
+    dx = float(goal[0] - start[0])
+    if abs(dx) < 1e-6:
+        return float(start[1])
+    t = (float(query_x) - float(start[0])) / dx
+    return float(start[1] + t * (goal[1] - start[1]))
+
+
+def approach_bearing(start_xy, goal_xy) -> float:
+    """Heading of the chassis-forward insert from start xy to the place stand."""
+    start = np.asarray(start_xy, dtype=float)[:2]
+    goal = np.asarray(goal_xy, dtype=float)[:2]
+    if start.shape != (2,) or goal.shape != (2,) or not np.all(np.isfinite(start)) or not np.all(np.isfinite(goal)):
+        raise ValueError("approach segment ends must be finite xy")
+    delta = goal - start
+    if float(np.linalg.norm(delta)) < 0.08:
+        raise ValueError(f"approach segment is too short: {delta.tolist()}")
+    return math.atan2(float(delta[1]), float(delta[0]))
+
+
+def palm_pair_xyz(slide: float, left_joints, right_joints) -> tuple[np.ndarray, np.ndarray]:
+    """Base-frame palm origins for a locked hug."""
+    backend = MMK2KdlBackend()
+    left_fk = backend.forward("l", float(slide), np.asarray(left_joints, dtype=float))
+    right_fk = backend.forward("r", float(slide), np.asarray(right_joints, dtype=float))
+    return np.asarray(left_fk[:3, 3], dtype=float), np.asarray(right_fk[:3, 3], dtype=float)
+
+
+def hold_palm_metrics(slide: float, left_joints, right_joints) -> dict:
+    """Palm span/tilt used to catch a one-sided sag before carry."""
+    left_p, right_p = palm_pair_xyz(slide, left_joints, right_joints)
+    half = float(0.5 * (left_p[1] - right_p[1]))
+    return {
+        "left_xyz": left_p.tolist(),
+        "right_xyz": right_p.tolist(),
+        "dz_m": float(left_p[2] - right_p[2]),
+        "dx_m": float(left_p[0] - right_p[0]),
+        "half_span_m": half,
+        "mid_xyz": (0.5 * (left_p + right_p)).tolist(),
+        "level_enough": (
+            abs(float(left_p[2] - right_p[2])) <= MAX_HOLD_PALM_DZ_M
+            and MIN_HOLD_HALF_SPAN_M <= half <= MAX_HOLD_HALF_SPAN_M
+        ),
+    }
+
+
+def level_hold_pose(slide: float, left_joints, right_joints, hold_half: float = TASK1_HOLD_HALF_M) -> dict:
+    """Re-solve a same-height 0.115 m hug around the current palm midpoint."""
+    half = float(hold_half)
+    if not MIN_HOLD_HALF_SPAN_M <= half <= TASK1_APPROACH_HALF_M:
+        raise ValueError(f"level hold half {half} is outside the side-face window")
+    left_p, right_p = palm_pair_xyz(slide, left_joints, right_joints)
+    mid = 0.5 * (left_p + right_p)
+    left_target = np.array([mid[0], mid[1] + half, mid[2]], dtype=float)
+    right_target = np.array([mid[0], mid[1] - half, mid[2]], dtype=float)
+    return solve_bimanual_pose(slide, left_joints, right_joints, left_target, right_target)
+
+
+def _bind_capped_hold_keeper(context, result, max_refresh: int = MAX_HOLD_REFRESH):
+    """Keep at most one extra j1 squeeze so palms do not crawl onto the box top."""
+    max_refresh = int(max_refresh)
+    if max_refresh < 0:
+        raise ValueError("max hold refresh must be >= 0")
+    inner = _bind_hold_keeper(context, result)
+
+    def keeper(left_current, right_current, left_hold, right_hold):
+        if int(result.get("hold_refresh_count", 0)) >= max_refresh:
+            contact = carry_hold_ok(left_current, right_current, left_hold, right_hold)
+            return np.asarray(left_hold, dtype=float), np.asarray(right_hold, dtype=float), contact
+        return inner(left_current, right_current, left_hold, right_hold)
+
+    return keeper
+
+
 def task3_placement_error(held_world, place_world, place_radius: float = PLACE_RADIUS_M) -> dict:
     """Local xy/z error of the locked box versus the instruction place point."""
     held = np.asarray(held_world, dtype=float)
-    place = validate_place_world_l1(place_world)
+    place = validate_shelf_side_place(place_world)
     radius = float(place_radius)
     if held.shape != (3,) or not np.all(np.isfinite(held)):
         raise ValueError("held_world must be a finite 3-vector")
@@ -244,17 +494,58 @@ def box_inside_place_radius(base_pose, held_center_base, place_world, place_radi
 def shelf_inward_ok(held_world, place_world, max_outward_m: float = MAX_PLACE_OUTWARD_M) -> dict:
     """True when the box is not still hanging off the west-facing shelf lip."""
     held = np.asarray(held_world, dtype=float)
-    place = validate_place_world_l1(place_world)
+    place = validate_shelf_side_place(place_world)
     limit = float(max_outward_m)
     if held.shape != (3,) or not np.all(np.isfinite(held)):
         raise ValueError("held_world must be a finite 3-vector")
-    if not 0.04 <= limit <= 0.18:
-        raise ValueError("max outward offset must be within [0.04, 0.18] m")
+    if not 0.02 <= limit <= 0.18:
+        raise ValueError("max outward offset must be within [0.02, 0.18] m")
     outward = float(held[0] - place[0])
     return {
         "outward_m": outward,
         "deep_enough": outward <= limit,
     }
+
+
+def locate_packaging(node, pick_yaw: float = PLACE_YAW):
+    """RGB-D lock of the shelf packaging box, mapped to its center."""
+    snapshot = node.wait_for_snapshot(timeout_sec=4.0)
+    detections = detect_colored_boxes(
+        snapshot.rgb,
+        "white",
+        min_area=max(60, snapshot.rgb.shape[0] * snapshot.rgb.shape[1] // 5000),
+    )
+    if not detections:
+        raise RuntimeError("no white packaging box detected in the current RGB frame")
+    detection = max(detections, key=lambda item: item.area * item.confidence)
+    depth = robust_depth_from_bbox(snapshot.depth_m, detection.bbox, min_samples=5)
+    camera_point = snapshot.intrinsics.project_pixel(*detection.center, depth)
+    frame = snapshot.camera_frame or "head_camera"
+    camera_to_world = node.transforms.lookup("odom", frame)
+    surface_world = transform_point(camera_to_world, camera_point)
+    center = center_from_shelf_front(surface_world, pick_yaw, half_depth=OBSTACLE_HALF_X_M)
+    if not (-2.95 <= center[0] <= -2.35 and 0.30 <= center[1] <= 1.20 and 0.42 <= center[2] <= 1.25):
+        raise RuntimeError(f"white detection is not a shelf packaging box: {center.tolist()}")
+    center_base = _world_to_base(node, center)
+    return {
+        "bbox": list(detection.bbox),
+        "pixel": list(detection.center),
+        "depth_m": float(depth),
+        "surface_world": surface_world.tolist(),
+        "center_world": center.tolist(),
+        "center_base": center_base.tolist(),
+        "source": "vision",
+    }
+
+
+def _look_at_shelf_obstacle(node, result):
+    node.controller.command_head(list(SHELF_OBSERVE_HEAD))
+    result["published_control_topics"] = list(dict.fromkeys(
+        result.get("published_control_topics", []) + ["/head_forward_position_controller/commands"]
+    ))
+    deadline = time.monotonic() + 1.2
+    while time.monotonic() < deadline:
+        node.spin_once(0.05)
 
 
 def locate_yellow(node, yaw: float = GRASP_YAW):
@@ -373,7 +664,7 @@ def _drive_line_task3(
             if (
                 inside["within_radius"]
                 and depth["deep_enough"]
-                and details["remaining_m"] <= max(float(position_tolerance), 0.05)
+                and details["remaining_m"] <= float(position_tolerance)
             ):
                 node.controller.stop_base()
                 result[f"{key_prefix}_accepted_inside_radius"] = True
@@ -424,6 +715,8 @@ def _establish_cube_top_hold(node, args, box_base, result):
     initial_slide = float(node.sensors.joint_vector(["slide_joint"])[0])
     if initial_slide > 0.10:
         raise RuntimeError("slide must start at a safe high posture (<= 0.10 m)")
+    # Palm Z is locked to PRE_GRASP_Z0 - slide with Task 1's wrist rotation.
+    # Raising the torso without changing that rotation yaws j0 and twists the hug.
     contact_slide = float(PRE_GRASP_Z0 - (box_base[2] + args.grasp_z_offset))
     if not SLIDE_LIMITS[0] <= contact_slide <= SLIDE_LIMITS[1]:
         raise RuntimeError(f"contact slide {contact_slide:.4f} is outside {SLIDE_LIMITS}")
@@ -532,62 +825,117 @@ def _establish_cube_top_hold(node, args, box_base, result):
                 "clearance_m": plan["clearance_m"], "reason": "still_at_pregrasp",
             })
             continue
-        if waypoint_result.get("blocked_hug"):
-            tight = plans[-1]
-            hold_left, hold_right = inward_hold_from_blocked(
-                reached_left, reached_right, tight["left_joint_target"], tight["right_joint_target"],
-            )
-            try:
-                squeeze = _confirm_inward_squeeze(
-                    node, hold_left, hold_right, args.gripper_open, args.squeeze_seconds, result,
-                )
-                result["squeeze_confirmed"] = True
-                result["squeeze_feedback"] = squeeze
-            except RuntimeError as exc:
-                result["blocked_hug_squeeze_error"] = str(exc)
-            contact_plan = plan
-            contact_feedback = waypoint_result
-            break
-        if plan["clearance_m"] > CARRY_CLEARANCE_MAX_M:
+        if plan["clearance_m"] > CARRY_CLEARANCE_MAX_M and not waypoint_result.get("blocked_hug"):
             result.setdefault("rejected_false_contacts", []).append({
                 "clearance_m": plan["clearance_m"], "reason": "too_open_to_carry",
             })
             continue
-        hold_left = np.asarray(plan["left_joint_target"], dtype=float)
-        hold_right = np.asarray(plan["right_joint_target"], dtype=float)
+        # The 0.01 m waypoint still uses the 0.13 m approach half-gap.  Do not
+        # lock that open pose, and do not stop 22% of the way to 0.115 m: the
+        # hold keeper would then keep tightening j1 and crawl onto the box top.
+        tight = plans[-1]
+        if plan["clearance_m"] > 0.0:
+            result["phase"] = "close_to_hold_gap"
+            try:
+                reached_left, reached_right, close_result = _approach_until_reached_or_contact(
+                    node, reached_left, reached_right, tight["left_joint_target"], tight["right_joint_target"],
+                    args.joint_max_step, args.gripper_open, args.gripper_open,
+                    args.settle_timeout, APPROACH_JOINT_TOLERANCE_RAD, result,
+                    allow_early_contact=True,
+                )
+                result["close_to_hold_gap"] = {
+                    "contact_detected": bool(close_result.get("contact_detected")),
+                    "blocked_hug": bool(close_result.get("blocked_hug")),
+                    "left_max_joint_residual_rad": close_result.get("left_max_joint_residual_rad"),
+                    "right_max_joint_residual_rad": close_result.get("right_max_joint_residual_rad"),
+                }
+            except TimeoutError as exc:
+                left_now, right_now, _, _ = _current_arm_state_unbounded(node)
+                locked = blocked_table_hug_lock(
+                    left_now, right_now, high_left, high_right,
+                    tight["left_joint_target"], tight["right_joint_target"],
+                )
+                if locked is None:
+                    raise
+                reached_left, reached_right = locked["left"], locked["right"]
+                result["close_to_hold_gap_blocked"] = True
+                result["close_to_hold_gap_timeout_error"] = str(exc)
+        hold_left, hold_right = local_carry_hold(
+            reached_left, reached_right, TASK3_HOLD_SQUEEZE_RAD,
+        )
         try:
             squeeze = _confirm_inward_squeeze(
                 node, hold_left, hold_right, args.gripper_open, args.squeeze_seconds, result,
             )
+            result["squeeze_confirmed"] = True
+            result["squeeze_feedback"] = squeeze
         except RuntimeError as exc:
-            result.setdefault("rejected_false_contacts", []).append({
-                "clearance_m": plan["clearance_m"], "error": str(exc),
-                "feedback": result.get("squeeze_feedback"),
-            })
-            reached_left, reached_right, _, _ = _current_arm_state_unbounded(node)
-            continue
-        result["squeeze_confirmed"] = True
-        result["squeeze_feedback"] = squeeze
+            empty_close = "without the box blocking" in str(exc)
+            if waypoint_result.get("blocked_hug") and not empty_close:
+                result["blocked_hug_squeeze_error"] = str(exc)
+            else:
+                result.setdefault("rejected_false_contacts", []).append({
+                    "clearance_m": plan["clearance_m"], "error": str(exc),
+                    "feedback": result.get("squeeze_feedback"),
+                })
+                if empty_close:
+                    result["empty_hold_close"] = True
+                    break
+                reached_left, reached_right, _, _ = _current_arm_state_unbounded(node)
+                continue
         contact_plan = plan
         contact_feedback = waypoint_result
         break
     if contact_plan is None:
+        if result.get("empty_hold_close"):
+            raise TimeoutError(
+                "hug closed through empty space; palms were not on the yellow box faces"
+            )
         raise TimeoutError("dual-arm contact was not established at any validated clearance waypoint")
     result["contact_detected"] = True
     result["contact_feedback"] = contact_feedback
     result["contact_clearance_detected_m"] = contact_plan["clearance_m"]
     result["reached_contact_plans"] = reached
+    result["hold_palms_after_squeeze"] = hold_palm_metrics(contact_slide, hold_left, hold_right)
+    if abs(result["hold_palms_after_squeeze"]["dz_m"]) > MAX_HOLD_PALM_DZ_M:
+        leveled = level_hold_pose(contact_slide, hold_left, hold_right, args.hold_half)
+        hold_left, hold_right = local_carry_hold(
+            leveled["left_joint_target"], leveled["right_joint_target"], TASK3_HOLD_SQUEEZE_RAD,
+        )
+        try:
+            squeeze = _confirm_inward_squeeze(
+                node, hold_left, hold_right, args.gripper_open, args.squeeze_seconds, result,
+            )
+        except RuntimeError as exc:
+            raise TimeoutError(f"side-face hug could not be leveled: {exc}") from exc
+        result["hold_leveled"] = True
+        result["leveled_squeeze_feedback"] = squeeze
+        result["hold_palms_leveled"] = hold_palm_metrics(contact_slide, hold_left, hold_right)
+        if abs(result["hold_palms_leveled"]["dz_m"]) > MAX_HOLD_PALM_DZ_M:
+            raise TimeoutError(
+                "palms are still not level on the yellow box after height correction: "
+                f"{result['hold_palms_leveled']}"
+            )
     result["hold_joint_targets"] = {"left": np.asarray(hold_left).tolist(), "right": np.asarray(hold_right).tolist()}
     hold_left = np.asarray(hold_left, dtype=float)
     hold_right = np.asarray(hold_right, dtype=float)
+    context["hold_left"] = hold_left
+    context["hold_right"] = hold_right
     # The cube top is 0.10 m below the lifted box bottom.  Leaving the table
     # at contact height drags the yellow box off the white cube.
     _traverse_spine_holding(
         node, contact_slide, lift_slide, args.spine_max_step, args.settle_timeout, args.spine_tolerance,
         hold_left, hold_right, args.gripper_open, result,
+        hold_keeper=_bind_capped_hold_keeper(context, result),
     )
     result["lift_completed"] = True
     result["lift_slide_feedback"] = float(node.sensors.joint_vector(["slide_joint"])[0])
+    hold_left = np.asarray(context.get("hold_left", hold_left), dtype=float)
+    hold_right = np.asarray(context.get("hold_right", hold_right), dtype=float)
+    result["hold_joint_targets"] = {"left": hold_left.tolist(), "right": hold_right.tolist()}
+    result["hold_palms_after_lift"] = hold_palm_metrics(
+        float(result["lift_slide_feedback"]), hold_left, hold_right,
+    )
     context.update({
         "hold_left": hold_left,
         "hold_right": hold_right,
@@ -610,11 +958,22 @@ def _recover(node, context, args, result, start_base, phase: str, released: bool
     near_shelf = current is not None and float(current[0]) <= SHELF_ZONE_X_MAX
     if holding and near_shelf:
         result["recovery_kept_hold"] = True
-        result["recovery_skipped_pull_out"] = True
         try:
-            _command_hug(node, context["hold_left"], context["hold_right"], args.gripper_open)
+            _drive_line_task3(
+                node, current, pose_offset(current, args.shelf_retreat, reverse=True), -1,
+                args.retreat_timeout, result, context["hold_left"], context["hold_right"], args.gripper_open,
+                require_hold=True, min_traveled_m=0.20, position_tolerance=0.06,
+                max_linear_speed=MAX_SHELF_LINEAR_SPEED,
+                key_prefix="recovery_held_retreat", hold_keeper=_bind_capped_hold_keeper(context, result),
+            )
+            result["recovery_held_retreat_completed"] = True
         except Exception as exc:
-            result["recovery_keep_hold_error"] = str(exc)
+            result["recovery_held_retreat_error"] = str(exc)
+            result["recovery_skipped_pull_out"] = True
+            try:
+                _command_hug(node, context["hold_left"], context["hold_right"], args.gripper_open)
+            except Exception as hug_exc:
+                result["recovery_keep_hold_error"] = str(hug_exc)
     elif holding and phase in {"hug_lift", "table_leave"} and start_base is not None and current is not None:
         try:
             _drive_line_task3(
@@ -646,7 +1005,12 @@ def _recover(node, context, args, result, start_base, phase: str, released: bool
             result["recovery_released_retreat_error"] = str(exc)
     can_retract = (
         context.get("initial_left") is not None
-        and (released or context.get("hold_left") is None or result.get("recovery_lowered_before_retract"))
+        and (
+            released
+            or context.get("hold_left") is None
+            or result.get("recovery_lowered_before_retract")
+            or result.get("recovery_table_error")
+        )
     )
     if can_retract:
         try:
@@ -674,10 +1038,10 @@ def main(argv=None) -> int:
     parser.add_argument("--standoff", type=float, default=TASK3_STANDOFF_M)
     parser.add_argument("--initial-clearance", type=float, default=0.02)
     parser.add_argument("--contact-step", type=float, default=0.01)
-    parser.add_argument("--grasp-fwd-offset", type=float, default=TASK1_GRASP_FWD_OFFSET_M)
-    parser.add_argument("--grasp-z-offset", type=float, default=TASK1_GRASP_Z_OFFSET_M)
+    parser.add_argument("--grasp-fwd-offset", type=float, default=TASK3_GRASP_FWD_OFFSET_M)
+    parser.add_argument("--grasp-z-offset", type=float, default=TASK3_GRASP_Z_OFFSET_M)
     parser.add_argument("--approach-half", type=float, default=TASK1_APPROACH_HALF_M)
-    parser.add_argument("--hold-half", type=float, default=TASK1_HOLD_HALF_M)
+    parser.add_argument("--hold-half", type=float, default=TASK3_HOLD_HALF_M)
     parser.add_argument("--gripper-open", type=float, default=1.0)
     parser.add_argument("--gripper-max-step", type=float, default=0.10)
     parser.add_argument("--lift-height", type=float, default=TASK3_LIFT_HEIGHT_M)
@@ -696,6 +1060,7 @@ def main(argv=None) -> int:
     parser.add_argument("--table-leave-timeout", type=float, default=DEFAULT_LINE_TIMEOUT_SEC)
     parser.add_argument("--shelf-timeout", type=float, default=DEFAULT_SHELF_TIMEOUT_SEC)
     parser.add_argument("--retreat-timeout", type=float, default=DEFAULT_LINE_TIMEOUT_SEC)
+    parser.add_argument("--no-detect-obstacle", action="store_true")
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--output", default="/tmp/task3_cube_top_shelf_place_check.json")
     args = parser.parse_args(argv)
@@ -705,13 +1070,13 @@ def main(argv=None) -> int:
         parser.error("gripper-open is invalid")
     if args.settle_timeout <= 0 or args.nav_timeout <= 0 or args.yaw_timeout <= 0 or args.squeeze_seconds <= 0:
         parser.error("timeout arguments are invalid")
-    if not TASK1_HOLD_HALF_M <= args.hold_half <= args.approach_half <= TASK1_APPROACH_HALF_M:
-        parser.error("hold-half must be within [0.115, approach-half], and approach-half <= 0.13 m")
+    if not TASK3_HOLD_HALF_M <= args.hold_half <= args.approach_half <= TASK1_APPROACH_HALF_M:
+        parser.error("hold-half must be within [0.105, approach-half], and approach-half <= 0.13 m")
     if not 0.06 <= args.place_accept_radius <= args.place_radius:
         parser.error("place-accept-radius must be within [0.06, place-radius]")
     if not lift_clears_cube(YELLOW_FIXED_WORLD[2], args.lift_height):
         parser.error("lift height would not clear the white cube top")
-    place_world = validate_place_world_l1(args.place_world)
+    place_world = validate_shelf_side_place(args.place_world)
     place_yaw = wrap_to_pi(args.place_yaw)
     grasp_yaw = wrap_to_pi(args.grasp_yaw)
     print(
@@ -786,10 +1151,39 @@ def main(argv=None) -> int:
             print("resuming held transport; skipping cube-top grasp", flush=True)
         if resume_shelf:
             print("resuming in-shelf hug; skipping grasp and table leave", flush=True)
+        if args.apply and not carrying and initial_slide > 0.10:
+            print(f"restoring high posture from leftover slide {initial_slide:.3f} m", flush=True)
+            command_issued = True
+            high_plan = solve_bimanual_hug_pose(initial_slide, initial_left, initial_right)
+            high_left, high_right = _traverse_pair(
+                node, initial_left, initial_right,
+                high_plan["left_joint_target"], high_plan["right_joint_target"],
+                args.joint_max_step, args.settle_timeout, RETRACTION_JOINT_TOLERANCE_RAD,
+                initial_left_gripper, initial_right_gripper, True, result,
+            )
+            _traverse_spine(
+                node, initial_slide, min(0.03, initial_slide), args.spine_max_step,
+                args.settle_timeout, args.spine_tolerance, True, result,
+            )
+            initial_slide = float(node.sensors.joint_vector(["slide_joint"])[0])
+            initial_left, initial_right = high_left, high_right
+            initial_left_gripper = command_gripper_value(args.gripper_open)
+            initial_right_gripper = command_gripper_value(args.gripper_open)
+            context.update({
+                "initial_left": initial_left,
+                "initial_right": initial_right,
+                "initial_left_gripper": initial_left_gripper,
+                "initial_right_gripper": initial_right_gripper,
+                "initial_slide": initial_slide,
+            })
+            result["initial_slide"] = initial_slide
+            result["restored_high_posture"] = True
+            if initial_slide > 0.10:
+                raise RuntimeError(f"slide still {initial_slide:.4f} m after high-posture restore")
 
         phase = "detect"
         result["phase"] = phase
-        keeper = _bind_hold_keeper(context, result)
+        keeper = _bind_capped_hold_keeper(context, result)
         located = None
         box_world = None
         if args.box_world is not None:
@@ -802,13 +1196,43 @@ def main(argv=None) -> int:
             box_world = YELLOW_FIXED_WORLD.copy()
             located = {"center_world": box_world.tolist(), "source": "fixed_layout_dry_run"}
         else:
+            current_pose = _odom_pose(node)
+            if should_backup_to_observe(current_pose):
+                result["observe_backup_from"] = current_pose.tolist()
+                command_issued = True
+                _backup_reverse(node, OBSERVE_BACKUP_M, OBSERVE_BACKUP_TIMEOUT_SEC, result)
             _look_at_table(node, result)
+            last_exc = None
             try:
                 located = locate_yellow(node, grasp_yaw)
             except Exception as exc:
                 result["vision_error"] = str(exc)
-                if not args.allow_fixed_yellow:
-                    raise
+                last_exc = exc
+                located = None
+            if located is None:
+                for _attempt in range(MAX_OBSERVE_BACKUP_ATTEMPTS):
+                    current_pose = _odom_pose(node)
+                    if not should_backup_to_observe(current_pose):
+                        break
+                    result["observe_backup_attempts"] = int(result.get("observe_backup_attempts", 0)) + 1
+                    command_issued = True
+                    _backup_reverse(node, OBSERVE_BACKUP_M, OBSERVE_BACKUP_TIMEOUT_SEC, result)
+                    _look_at_table(node, result)
+                    try:
+                        located = locate_yellow(node, grasp_yaw)
+                        result["detection_after_observe_backup"] = True
+                        break
+                    except Exception as retry_exc:
+                        result["vision_error"] = str(retry_exc)
+                        last_exc = retry_exc
+                        located = None
+            if located is None:
+                near_table = should_backup_to_observe(_odom_pose(node))
+                if near_table or not args.allow_fixed_yellow:
+                    raise RuntimeError(
+                        f"yellow box not visible ({last_exc}); refusing the nominal cube-top "
+                        "hug because the box may have moved. Reset the Server scene and retry."
+                    ) from last_exc
                 box_world = YELLOW_FIXED_WORLD.copy()
                 located = {"center_world": box_world.tolist(), "source": "fixed_layout_fallback"}
         if box_world is None:
@@ -820,9 +1244,10 @@ def main(argv=None) -> int:
         station = station_for_yellow(box_world, args.standoff, grasp_yaw)
         result["station_target"] = station.tolist()
         place_stand = place_stand_from_goal(place_world, place_yaw, np.array([0.56, 0.0, box_world[2] + args.lift_height]))
-        stage_pose = staging_pose(place_stand, place_yaw, args.staging_back)
+        stage_pose, insert_xy = aisle_staging_from_stand(place_stand, place_yaw, args.staging_back)
         result["place_stand_xy_nominal"] = place_stand.tolist()
         result["staging_pose_nominal"] = stage_pose.tolist()
+        result["shelf_insert_xy_nominal"] = insert_xy.tolist()
 
         contact_slide = float(PRE_GRASP_Z0 - (box_world[2] + args.grasp_z_offset))
         if not SLIDE_LIMITS[0] <= contact_slide <= SLIDE_LIMITS[1]:
@@ -868,6 +1293,9 @@ def main(argv=None) -> int:
             result["station_navigation"] = station_navigation
             box_base = np.asarray(_world_to_base(node, box_world), dtype=float)
             result["box_base_at_hug"] = box_base.tolist()
+            raw = located.get("center_world_raw")
+            if raw is not None:
+                result["box_base_from_raw"] = np.asarray(_world_to_base(node, raw), dtype=float).tolist()
             if not (HUG_WINDOW_X[0] <= box_base[0] <= HUG_WINDOW_X[1] and abs(box_base[1]) <= HUG_WINDOW_ABS_Y):
                 raise RuntimeError(f"yellow box is outside the hug window after station: {box_base.tolist()}")
 
@@ -904,7 +1332,7 @@ def main(argv=None) -> int:
             result["lift_completed"] = True
             current_slide = float(node.sensors.joint_vector(["slide_joint"])[0])
             try:
-                context["held_center_base"] = held_center_from_palms(current_slide, initial_left, initial_right)
+                context["held_center_base"] = held_center_from_palms_l1(current_slide, initial_left, initial_right)
                 result["held_center_source"] = "palm_fk"
             except Exception as exc:
                 result["palm_center_error"] = str(exc)
@@ -917,6 +1345,20 @@ def main(argv=None) -> int:
             }
             result["held_center_base_after_lift"] = context["held_center_base"].tolist()
             _command_hug(node, context["hold_left"], context["hold_right"], args.gripper_open)
+            if in_shelf:
+                print("held in shelf; reversing out before continuing", flush=True)
+                command_issued = True
+                retreat_start = _odom_pose(node)
+                retreat_target = pose_offset(retreat_start, args.shelf_retreat, reverse=True)
+                _drive_line_task3(
+                    node, retreat_start, retreat_target, -1, args.retreat_timeout, result,
+                    context["hold_left"], context["hold_right"], args.gripper_open,
+                    require_hold=True, min_traveled_m=0.20, position_tolerance=0.06,
+                    max_linear_speed=MAX_SHELF_LINEAR_SPEED,
+                    key_prefix="resume_held_retreat", hold_keeper=keeper,
+                )
+                result["resume_held_retreat_completed"] = True
+                in_shelf = False
 
         phase = "face_west"
         result["phase"] = phase
@@ -929,13 +1371,14 @@ def main(argv=None) -> int:
         phase = "staging_nav"
         result["phase"] = phase
         place_stand = place_stand_from_goal(place_world, place_yaw, context["held_center_base"])
-        stage_pose = staging_pose(place_stand, place_yaw, args.staging_back)
+        stage_pose, insert_xy = aisle_staging_from_stand(place_stand, place_yaw, args.staging_back)
         result["place_stand_xy"] = place_stand.tolist()
         result["staging_pose"] = stage_pose.tolist()
+        result["shelf_insert_xy"] = insert_xy.tolist()
         staging_final = _navigate_holding(
             node, stage_pose, args.nav_timeout, MAX_STAGING_NAV_M, result,
             context["hold_left"], context["hold_right"], args.gripper_open,
-            hold_keeper=keeper,
+            position_tolerance=0.04, yaw_tolerance=PLACE_ALIGN_YAW_TOLERANCE_RAD, hold_keeper=keeper,
         )
         result["staging_final_base"] = staging_final.tolist()
         result["staging_completed"] = True
@@ -944,13 +1387,41 @@ def main(argv=None) -> int:
             hold_keeper=keeper,
         )
 
+        phase = "locate_obstacle"
+        result["phase"] = phase
+        approach_hold_z = TASK3_APPROACH_Z_M
+        if not args.no_detect_obstacle:
+            _look_at_shelf_obstacle(node, result)
+            try:
+                located_obs = locate_packaging(node, place_yaw)
+                derived = place_left_of_obstacle(located_obs["center_world"])
+                place_world = derived
+                approach_hold_z = approach_z_over_obstacle(located_obs["center_world"][2])
+                result["obstacle_detection"] = located_obs
+                result["place_world"] = place_world.tolist()
+                result["place_world_source"] = "obstacle_left"
+                result["detected_obstacle_layer_z_m"] = nearest_shelf_board_z(located_obs["center_world"][2])
+            except Exception as exc:
+                result["obstacle_detection_error"] = str(exc)
+                result["place_world_source"] = "instruction_fallback"
+        else:
+            result["place_world_source"] = "instruction"
+        result["approach_hold_z_m"] = float(approach_hold_z)
+
         phase = "shelf_lower"
         result["phase"] = phase
         current_slide = float(node.sensors.joint_vector(["slide_joint"])[0])
         clearance_slide = slide_for_held_z(
-            current_slide, context["held_center_base"][2], place_world[2] + args.place_clearance,
+            current_slide, context["held_center_base"][2], approach_hold_z,
         )
         result["place_clearance_slide"] = clearance_slide
+        result["approach_hold_z_m"] = float(approach_hold_z)
+        result["approach_clears_packaging"] = approach_clears_packaging(approach_hold_z)
+        obstacle_z = float(PACKAGING_WORLD[2])
+        located_obs = result.get("obstacle_detection")
+        if located_obs is not None:
+            obstacle_z = float(located_obs["center_world"][2])
+        result["place_is_l1_layer"] = place_is_l1_layer(place_world[2], packaging_z=obstacle_z)
         _traverse_spine_holding(
             node, current_slide, clearance_slide, args.spine_max_step, args.settle_timeout, args.spine_tolerance,
             context["hold_left"], context["hold_right"], args.gripper_open, result,
@@ -959,7 +1430,7 @@ def main(argv=None) -> int:
         context["held_center_base"] = apply_slide_keep_hold(context["held_center_base"], current_slide, clearance_slide)
         try:
             left_now, right_now, _, _ = _current_arm_state_unbounded(node)
-            context["held_center_base"] = held_center_from_palms(
+            context["held_center_base"] = held_center_from_palms_l1(
                 float(node.sensors.joint_vector(["slide_joint"])[0]), left_now, right_now,
             )
             result["held_center_source_at_clearance"] = "palm_fk"
@@ -972,57 +1443,91 @@ def main(argv=None) -> int:
         result["phase"] = phase
         approach_start = _odom_pose(node)
         place_stand_now = place_stand_from_goal(place_world, place_yaw, context["held_center_base"])
-        place_pose = np.array([place_stand_now[0], place_stand_now[1], place_yaw], dtype=float)
+        insert_plan = aligned_shelf_insert_plan(place_stand_now, place_yaw=place_yaw)
+        insert_now = insert_plan["insert_xy"]
         result["place_stand_xy"] = place_stand_now.tolist()
-        try:
-            approach_final = _drive_line_task3(
-                node, approach_start, place_pose, 1, args.shelf_timeout, result,
-                context["hold_left"], context["hold_right"], args.gripper_open,
-                require_hold=True, position_tolerance=0.03, max_linear_speed=MAX_SHELF_LINEAR_SPEED,
-                key_prefix="shelf_approach",
-                held_center_base=context["held_center_base"],
-                place_world=place_world,
-                place_radius=args.place_accept_radius,
-                hold_keeper=keeper,
-            )
-        except TimeoutError as exc:
-            approach_final = _odom_pose(node)
-            inside = box_inside_place_radius(
-                approach_final, context["held_center_base"], place_world, args.place_accept_radius,
-            )
-            result["shelf_approach_timeout_estimated_place_world"] = inside["held_world"]
-            result["shelf_approach_timeout_xy_error_m"] = inside["xy_error_m"]
-            depth = shelf_inward_ok(inside["held_world"], place_world)
-            result["shelf_approach_timeout_outward_m"] = depth["outward_m"]
-            if not inside["within_radius"] or not depth["deep_enough"]:
+        result["shelf_insert_xy"] = insert_now.tolist()
+        result["shelf_approach_west_then_south"] = True
+        result["shelf_approach_south_bearing_rad"] = insert_plan["south_bearing"]
+        result["shelf_approach_y_at_stall_x"] = insert_line_y_at_x(
+            approach_start[:2], insert_now, APPROACH_STALL_X_M,
+        )
+        _face_yaw_holding(
+            node, insert_plan["west_yaw"], args.yaw_timeout, result,
+            context["hold_left"], context["hold_right"], args.gripper_open,
+            yaw_tolerance=PLACE_ALIGN_YAW_TOLERANCE_RAD,
+            key_prefix="shelf_approach_face_west", hold_keeper=keeper,
+        )
+        west_start = _odom_pose(node)
+        west_pose = np.array([insert_now[0], insert_now[1], insert_plan["west_yaw"]], dtype=float)
+        if float(np.linalg.norm(west_start[:2] - insert_now)) > 0.03:
+            try:
+                _drive_line_task3(
+                    node, west_start, west_pose, 1, args.shelf_timeout, result,
+                    context["hold_left"], context["hold_right"], args.gripper_open,
+                    require_hold=True, position_tolerance=0.03, max_linear_speed=MAX_SHELF_LINEAR_SPEED,
+                    key_prefix="shelf_approach_west",
+                    hold_keeper=keeper,
+                )
+            except TimeoutError:
+                west_now = _odom_pose(node)
+                result["shelf_approach_west_timeout_base"] = west_now.tolist()
                 raise
-            result["shelf_approach_accepted_inside_radius"] = True
-            result["shelf_approach_timeout_error"] = str(exc)
+        if insert_plan["needs_south_shift"]:
+            _face_yaw_holding(
+                node, insert_plan["south_bearing"], args.yaw_timeout, result,
+                context["hold_left"], context["hold_right"], args.gripper_open,
+                yaw_tolerance=0.08, key_prefix="shelf_approach_face_south", hold_keeper=keeper,
+            )
+            south_start = _odom_pose(node)
+            south_pose = np.array(
+                [place_stand_now[0], place_stand_now[1], south_start[2]], dtype=float,
+            )
+            try:
+                _drive_line_task3(
+                    node, south_start, south_pose, 1, args.shelf_timeout, result,
+                    context["hold_left"], context["hold_right"], args.gripper_open,
+                    require_hold=True, position_tolerance=0.03, max_linear_speed=MAX_SHELF_LINEAR_SPEED,
+                    key_prefix="shelf_approach_south",
+                    held_center_base=context["held_center_base"],
+                    place_world=place_world,
+                    place_radius=args.place_accept_radius,
+                    hold_keeper=keeper,
+                )
+            except TimeoutError as exc:
+                approach_final = _odom_pose(node)
+                inside = box_inside_place_radius(
+                    approach_final, context["held_center_base"], place_world, args.place_accept_radius,
+                )
+                result["shelf_approach_timeout_estimated_place_world"] = inside["held_world"]
+                result["shelf_approach_timeout_xy_error_m"] = inside["xy_error_m"]
+                depth = shelf_inward_ok(inside["held_world"], place_world)
+                result["shelf_approach_timeout_outward_m"] = depth["outward_m"]
+                if not inside["within_radius"] or not depth["deep_enough"]:
+                    raise
+                result["shelf_approach_accepted_inside_radius"] = True
+                result["shelf_approach_timeout_error"] = str(exc)
+        _face_yaw_holding(
+            node, insert_plan["west_yaw"], args.yaw_timeout, result,
+            context["hold_left"], context["hold_right"], args.gripper_open,
+            yaw_tolerance=PLACE_ALIGN_YAW_TOLERANCE_RAD,
+            key_prefix="shelf_approach_square_west", hold_keeper=keeper,
+        )
+        approach_final = _odom_pose(node)
         result["place_final_base"] = approach_final.tolist()
         result["shelf_approach_completed"] = True
         _sleep_holding(
             node, 0.4, context["hold_left"], context["hold_right"], args.gripper_open,
             hold_keeper=keeper,
         )
-        ready = box_inside_place_radius(
-            _odom_pose(node), context["held_center_base"], place_world, args.place_accept_radius,
-        )
-        result["pre_lower_estimated_place_world"] = ready["held_world"]
-        result["pre_lower_xy_error_m"] = ready["xy_error_m"]
-        pre_lower_depth = shelf_inward_ok(ready["held_world"], place_world)
-        result["pre_lower_outward_m"] = pre_lower_depth["outward_m"]
-        if not ready["within_radius"] or not pre_lower_depth["deep_enough"]:
-            raise RuntimeError(
-                f"box is still on the shelf lip (xy error {ready['xy_error_m']:.3f} m, "
-                f"outward {pre_lower_depth['outward_m']:.3f} m); "
-                f"need <= {args.place_accept_radius:.2f} m and inward of {MAX_PLACE_OUTWARD_M:.2f} m"
-            )
 
         phase = "place_lower"
         result["phase"] = phase
         current_slide = float(node.sensors.joint_vector(["slide_joint"])[0])
         place_slide = slide_for_held_z(current_slide, context["held_center_base"][2], place_world[2])
         result["place_slide"] = place_slide
+        result["place_layer_z_m"] = float(place_world[2])
+        result["packaging_center_z_m"] = float(PACKAGING_WORLD[2])
         _traverse_spine_holding(
             node, current_slide, place_slide, args.spine_max_step, args.settle_timeout, args.spine_tolerance,
             context["hold_left"], context["hold_right"], args.gripper_open, result,
@@ -1046,6 +1551,34 @@ def main(argv=None) -> int:
         result["pre_release_xy_error_m"] = release_ready["xy_error_m"]
         release_depth = shelf_inward_ok(release_ready["held_world"], place_world)
         result["pre_release_outward_m"] = release_depth["outward_m"]
+        if not release_ready["within_radius"] or not release_depth["deep_enough"]:
+            creep_start = _odom_pose(node)
+            creep_target = np.array(
+                [place_stand_now[0], place_stand_now[1], insert_plan["west_yaw"]], dtype=float,
+            )
+            result["l1_creep_target"] = creep_target.tolist()
+            _drive_line_task3(
+                node, creep_start, creep_target, 1, args.shelf_timeout, result,
+                context["hold_left"], context["hold_right"], args.gripper_open,
+                require_hold=True, position_tolerance=0.03, max_linear_speed=MAX_SHELF_LINEAR_SPEED,
+                key_prefix="l1_creep",
+                held_center_base=context["held_center_base"],
+                place_world=place_world,
+                place_radius=args.place_accept_radius,
+                hold_keeper=keeper,
+            )
+            release_ready = box_inside_place_radius(
+                _odom_pose(node), context["held_center_base"], place_world, args.place_accept_radius,
+            )
+            result["pre_release_xy_error_m"] = release_ready["xy_error_m"]
+            release_depth = shelf_inward_ok(release_ready["held_world"], place_world)
+            result["pre_release_outward_m"] = release_depth["outward_m"]
+            estimated = held_center_world(_odom_pose(node), context["held_center_base"])
+            error = task3_placement_error(estimated, place_world, args.place_radius)
+            result["estimated_place_world"] = estimated.tolist()
+            result["place_xy_error_m"] = error["xy_error_m"]
+            result["place_z_error_m"] = error["z_error_m"]
+            result["place_within_radius"] = error["within_radius"]
         if not release_ready["within_radius"] or not release_depth["deep_enough"]:
             raise RuntimeError(
                 f"refusing to release on the shelf lip; xy error {release_ready['xy_error_m']:.3f} m, "

@@ -27,6 +27,11 @@ COLOR_ALIASES = {
     "棕色": "brown",
     "褐色": "brown",
     "褐色方块": "brown",
+    "white": "white",
+    "white_box": "white",
+    "packaging_box": "white",
+    "白色": "white",
+    "白色长方体": "white",
 }
 
 

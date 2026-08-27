@@ -91,9 +91,11 @@ DEFAULT_YAW_TIMEOUT_SEC = 40.0
 APPROACH_STALL_SEC = 4.0
 # Scoring radius is 0.24 m. Its room-side edge sits in the air in front of
 # the cabinet (~x=-2.44).  A 0.18 m accept stopped on the lip (box x≈-2.50)
-# and the box fell.  Drive to the place stand; only lower if still on-shelf.
+# and the box fell.  A later 0.08 m / 0.10 m outward gate still released
+# 5 cm short of the place stand (box x≈-2.64) and the box tipped off.
+# Drive to the place stand; only lower if still on-shelf.
 APPROACH_ACCEPT_RADIUS_M = 0.08
-MAX_PLACE_OUTWARD_M = 0.10
+MAX_PLACE_OUTWARD_M = 0.04
 
 
 def validate_place_world(place_world) -> np.ndarray:
@@ -244,8 +246,8 @@ def shelf_inward_ok(held_world, place_world, max_outward_m: float = MAX_PLACE_OU
     limit = float(max_outward_m)
     if held.shape != (3,) or not np.all(np.isfinite(held)):
         raise ValueError("held_world must be a finite 3-vector")
-    if not 0.04 <= limit <= 0.18:
-        raise ValueError("max outward offset must be within [0.04, 0.18] m")
+    if not 0.02 <= limit <= 0.18:
+        raise ValueError("max outward offset must be within [0.02, 0.18] m")
     outward = float(held[0] - place[0])
     return {
         "outward_m": outward,
@@ -424,11 +426,12 @@ def _drive_line(
             result[f"{key_prefix}_outward_m"] = depth["outward_m"]
             # Do not stop on the scoring/accept circle.  That circle's room-side
             # edge is the shelf lip.  Only finish early once the chassis is also
-            # on the place stand and the box is inward of the lip.
+            # on the place stand and the box is inward of the lip.  A 5 cm
+            # remaining leftover left the box on the edge and it fell on release.
             if (
                 inside["within_radius"]
                 and depth["deep_enough"]
-                and details["remaining_m"] <= max(float(position_tolerance), 0.05)
+                and details["remaining_m"] <= float(position_tolerance)
             ):
                 node.controller.stop_base()
                 result[f"{key_prefix}_accepted_inside_radius"] = True

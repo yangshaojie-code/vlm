@@ -70,6 +70,9 @@ def _mask(rgb: np.ndarray, color: str) -> np.ndarray:
         # Require stronger chroma than the wooden tabletop.  The fixed-layout
         # shelf box has a distinctly more saturated brown front face.
         return (hue >= 12.0) & (hue <= 40.0) & (saturation >= 0.53) & (maximum >= 0.22) & (maximum <= 0.82)
+    if color == "white":
+        # Packaging box: bright, low-chroma.  Reject warm wood and saturated boxes.
+        return (saturation <= 0.22) & (maximum >= 0.72)
     raise ValueError(f"不支持的颜色: {color}")
 
 

@@ -4,10 +4,12 @@ import numpy as np
 
 from bimanual_hug_planning import (
     FK_POSITION_TOLERANCE_M,
+    LEGACY_FAR_LIP_GRASP_FWD_M,
     MAX_INWARD_DELTA,
     PRE_GRASP_LAT,
     build_bimanual_hug_plan,
     lateral_for_inward,
+    side_face_hug_geometry,
     solve_bimanual_pose,
 )
 
@@ -48,6 +50,22 @@ class BimanualHugPlanningTests(unittest.TestCase):
         )
         self.assertLess(plan["left_fk_error_m"], FK_POSITION_TOLERANCE_M)
         self.assertLess(plan["right_fk_error_m"], FK_POSITION_TOLERANCE_M)
+
+    def test_side_face_hug_centers_palms_on_the_squeezed_faces(self):
+        table = side_face_hug_geometry(squeeze_axis="x", box_point="center")
+        self.assertAlmostEqual(table["grasp_fwd_offset_m"], 0.0)
+        self.assertAlmostEqual(table["grasp_z_offset_m"], 0.02)
+        self.assertAlmostEqual(table["hold_half_m"], 0.115)
+        self.assertAlmostEqual(table["approach_half_m"], 0.13)
+        front = side_face_hug_geometry(squeeze_axis="x", box_point="front_face")
+        self.assertAlmostEqual(front["grasp_fwd_offset_m"], 0.08)
+        self.assertGreater(LEGACY_FAR_LIP_GRASP_FWD_M, 0.5 * table["depth_half_m"])
+        shelf = side_face_hug_geometry(squeeze_axis="y", box_point="center")
+        self.assertAlmostEqual(shelf["grasp_fwd_offset_m"], 0.0)
+        self.assertAlmostEqual(shelf["hold_half_m"], 0.08)
+        self.assertAlmostEqual(shelf["approach_half_m"], 0.10)
+        with self.assertRaises(ValueError):
+            side_face_hug_geometry(squeeze_axis="z")
 
 
 if __name__ == "__main__":

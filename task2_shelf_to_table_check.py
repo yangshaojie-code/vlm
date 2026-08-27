@@ -264,8 +264,8 @@ def maintain_carry_hold(left_current, right_current, left_hold, right_hold):
     hugging = float(left_current[1]) <= -0.70 and float(right_current[1]) <= -0.70
     settled = (
         hugging
-        and left_err <= CONTACT_MAX_JOINT_RESIDUAL_RAD
-        and right_err <= CONTACT_MAX_JOINT_RESIDUAL_RAD
+        and left_err <= CONTACT_MAX_JOINT_RESIDUAL_RAD + 0.02
+        and right_err <= CONTACT_MAX_JOINT_RESIDUAL_RAD + 0.02
     )
     if not settled:
         return left_hold, right_hold, contact

@@ -19,6 +19,11 @@ PRE_GRASP_LAT = 0.22475936
 PRE_GRASP_Z0 = 1.32163718
 MAX_INWARD_DELTA = 0.04
 FK_POSITION_TOLERANCE_M = 1e-5
+# Competition carton half-extents: 0.24 x 0.16 x 0.19 m.
+COMPETITION_BOX_HALF_M = (0.12, 0.08, 0.095)
+# Official-client leftover: +0.065 m past a reconstructed center rides the
+# far lip of the 0.16 m table/cube depth and is not a max-contact hug.
+LEGACY_FAR_LIP_GRASP_FWD_M = 0.065
 
 LEFT_A_ROT = np.array([
     [0.99890619, 0.04294831, 0.01848963],
@@ -30,6 +35,52 @@ RIGHT_A_ROT = np.array([
     [0.02030260, 0.04216758, -0.99890425],
     [0.04212158, 0.99818703, 0.04299342],
 ])
+
+
+def side_face_hug_geometry(
+    half_extents=COMPETITION_BOX_HALF_M,
+    squeeze_axis: str = "x",
+    box_point: str = "center",
+) -> dict:
+    """Palm targets that cover the center of the squeezed side faces.
+
+    ``squeeze_axis`` is the box-frame axis the palms close along (``x`` for
+    the 0.24 m table/cube faces, ``y`` for the 0.16 m shelf-front faces).
+    Callers that already reconstructed the geometric center must pass
+    ``box_point="center"`` so no extra forward offset is added.  A raw
+    front-face RGB-D hit uses ``box_point="front_face"``, which shifts
+    forward by the remaining half-depth to reach that same center.
+    """
+    extents = np.asarray(half_extents, dtype=float)
+    if extents.shape != (3,) or not np.all(np.isfinite(extents)):
+        raise ValueError("half_extents must be a finite 3-vector")
+    hx, hy, hz = (float(value) for value in extents)
+    if min(hx, hy, hz) <= 0.0:
+        raise ValueError("half_extents must be positive")
+    if squeeze_axis == "x":
+        squeeze_half, depth_half = hx, hy
+        hold_half = min(squeeze_half, 0.115)
+        approach_cap = 0.13
+    elif squeeze_axis == "y":
+        squeeze_half, depth_half = hy, hx
+        hold_half = squeeze_half
+        approach_cap = 0.10
+    else:
+        raise ValueError("squeeze_axis must be 'x' or 'y'")
+    if box_point == "center":
+        grasp_fwd = 0.0
+    elif box_point == "front_face":
+        grasp_fwd = depth_half
+    else:
+        raise ValueError("box_point must be 'center' or 'front_face'")
+    return {
+        "hold_half_m": float(hold_half),
+        "approach_half_m": float(min(approach_cap, hold_half + 0.02)),
+        "grasp_fwd_offset_m": float(grasp_fwd),
+        "grasp_z_offset_m": float(min(0.02, 0.30 * hz)),
+        "squeeze_half_m": float(squeeze_half),
+        "depth_half_m": float(depth_half),
+    }
 
 
 def lateral_for_inward(inward_delta: float) -> float:

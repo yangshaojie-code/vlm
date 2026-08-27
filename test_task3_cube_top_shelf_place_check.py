@@ -7,15 +7,15 @@ import numpy as np
 from bimanual_hug_planning import PRE_GRASP_Z0
 from head_camera_kinematics import SLIDE_LIMITS
 from task1_pick_lift_check import (
-    TASK1_APPROACH_HALF_M,
     TASK1_GRASP_FWD_OFFSET_M,
-    TASK1_GRASP_Z_OFFSET_M,
     TASK1_HOLD_HALF_M,
     contact_approach_geometry,
     contact_clearance_schedule,
     lift_slide_target,
 )
 from task3_cube_top_shelf_place_check import (
+    APPROACH_STALL_X_M,
+    BOX_HALF_DEPTH_M,
     CUBE_TOP_CENTER_Z,
     CUBE_TOP_Z,
     GRASP_YAW,
@@ -23,13 +23,33 @@ from task3_cube_top_shelf_place_check import (
     PLACE_ACCEPT_RADIUS_M,
     PLACE_RADIUS_M,
     PLACE_YAW,
+    PLACE_ALIGN_YAW_TOLERANCE_RAD,
+    SHELF_AISLE_Y_M,
+    STATION_Y_MAX,
+    PACKAGING_WORLD,
+    TASK3_GRASP_FWD_OFFSET_M,
+    TASK3_GRASP_Z_OFFSET_M,
+    TASK3_HOLD_HALF_M,
+    TASK3_HOLD_SQUEEZE_RAD,
     TASK3_LIFT_HEIGHT_M,
     TASK3_STANDOFF_M,
     YELLOW_FIXED_WORLD,
+    _bind_capped_hold_keeper,
     _establish_cube_top_hold,
+    aisle_staging_from_stand,
+    aligned_shelf_insert_plan,
+    approach_bearing,
+    approach_clears_packaging,
     box_inside_place_radius,
     center_from_cube_surface,
+    hold_palm_metrics,
+    insert_line_y_at_x,
+    level_hold_pose,
     lift_clears_cube,
+    main,
+    nearest_shelf_board_z,
+    place_is_l1_layer,
+    place_left_of_obstacle,
     place_stand_from_goal,
     shelf_inward_ok,
     snap_cube_top_center,
@@ -56,11 +76,30 @@ class Task3CubeTopShelfPlaceCheckTests(unittest.TestCase):
         center = center_from_cube_surface([-0.54, 2.22, 1.03], GRASP_YAW)
         np.testing.assert_allclose(center, [-0.54, 2.30, 1.004], atol=1e-12)
         snapped = snap_cube_top_center([-0.52, 2.33, 1.06])
-        np.testing.assert_allclose(snapped, YELLOW_FIXED_WORLD, atol=1e-12)
+        np.testing.assert_allclose(snapped, [-0.54, 2.33, 1.004], atol=1e-12)
         north_biased = snap_cube_top_center([-0.621, 2.426, 1.05])
-        np.testing.assert_allclose(north_biased, YELLOW_FIXED_WORLD, atol=1e-12)
+        self.assertAlmostEqual(north_biased[0], -0.54)
+        self.assertAlmostEqual(north_biased[2], 1.004)
+        self.assertLessEqual(north_biased[1], STATION_Y_MAX + TASK3_STANDOFF_M - 0.01)
         stand = station_for_yellow(north_biased, TASK3_STANDOFF_M, GRASP_YAW)
-        np.testing.assert_allclose(stand, [-0.54, 1.76, math.pi / 2.0], atol=1e-12)
+        self.assertLessEqual(stand[1], STATION_Y_MAX)
+
+    def test_south_biased_detection_is_not_snapped_behind_the_box(self):
+        hug = snap_cube_top_center([-0.545, 2.257, 1.004])
+        np.testing.assert_allclose(hug, [-0.54, 2.257, 1.004], atol=1e-12)
+        stand = station_for_yellow(hug, TASK3_STANDOFF_M, GRASP_YAW)
+        self.assertAlmostEqual(stand[1], 2.257 - TASK3_STANDOFF_M)
+        robot = np.array([-0.545, 1.725, 1.516])
+
+        def base_x(world_xy):
+            dx = world_xy[0] - robot[0]
+            dy = world_xy[1] - robot[1]
+            return math.cos(robot[2]) * dx + math.sin(robot[2]) * dy
+
+        snapped_x = base_x([-0.54, 2.30])
+        raw_x = base_x(hug[:2])
+        self.assertGreater(snapped_x + TASK1_GRASP_FWD_OFFSET_M, raw_x + BOX_HALF_DEPTH_M)
+        self.assertLess(raw_x + TASK3_GRASP_FWD_OFFSET_M, raw_x + BOX_HALF_DEPTH_M - 0.03)
 
     def test_fixed_l1_place_world_is_valid(self):
         np.testing.assert_allclose(
@@ -84,24 +123,63 @@ class Task3CubeTopShelfPlaceCheckTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             station_for_yellow([-0.54, 2.62, 1.004], TASK3_STANDOFF_M, GRASP_YAW)
 
-    def test_hug_targets_use_verified_task1_geometry_at_cube_top_height(self):
+    def test_hug_covers_the_side_face_center_not_the_far_lip(self):
         box_base = np.array([0.56, -0.01, 1.004])
         left, right = contact_approach_geometry(
-            box_base, 0.0, TASK1_GRASP_FWD_OFFSET_M, TASK1_GRASP_Z_OFFSET_M, TASK1_HOLD_HALF_M,
+            box_base, 0.0, TASK3_GRASP_FWD_OFFSET_M, TASK3_GRASP_Z_OFFSET_M, TASK1_HOLD_HALF_M,
         )
-        np.testing.assert_allclose(left, [0.625, TASK1_HOLD_HALF_M - 0.01, 1.049], atol=1e-12)
-        np.testing.assert_allclose(right, [0.625, -TASK1_HOLD_HALF_M - 0.01, 1.049], atol=1e-12)
+        np.testing.assert_allclose(left, [0.56, TASK1_HOLD_HALF_M - 0.01, 1.024], atol=1e-12)
+        np.testing.assert_allclose(right, [0.56, -TASK1_HOLD_HALF_M - 0.01, 1.024], atol=1e-12)
         self.assertGreater(left[2], CUBE_TOP_Z, "palms must hug above the cube top")
+        self.assertLess(TASK3_GRASP_FWD_OFFSET_M, BOX_HALF_DEPTH_M * 0.4)
+        self.assertGreater(TASK1_GRASP_FWD_OFFSET_M, BOX_HALF_DEPTH_M * 0.5)
+        far_strip = BOX_HALF_DEPTH_M - TASK3_GRASP_FWD_OFFSET_M
+        self.assertGreater(far_strip, 0.05)
 
     def test_fixed_layout_slide_chain_stays_inside_limits(self):
-        contact_slide = float(PRE_GRASP_Z0 - (YELLOW_FIXED_WORLD[2] + TASK1_GRASP_Z_OFFSET_M))
+        from task3_cube_top_shelf_place_check import TASK3_APPROACH_Z_M
+        contact_slide = float(PRE_GRASP_Z0 - (YELLOW_FIXED_WORLD[2] + TASK3_GRASP_Z_OFFSET_M))
         lift_slide = lift_slide_target(contact_slide, TASK3_LIFT_HEIGHT_M)
         held_z = YELLOW_FIXED_WORLD[2] + TASK3_LIFT_HEIGHT_M
-        clearance_slide = lift_slide + (held_z - (INSTRUCTION_PLACE_WORLD[2] + 0.055))
-        place_slide = clearance_slide + 0.055
-        for slide in (contact_slide, lift_slide, clearance_slide, place_slide):
+        approach_slide = lift_slide + (held_z - TASK3_APPROACH_Z_M)
+        place_slide = approach_slide + (TASK3_APPROACH_Z_M - INSTRUCTION_PLACE_WORLD[2])
+        for slide in (contact_slide, lift_slide, approach_slide, place_slide):
             self.assertTrue(SLIDE_LIMITS[0] <= slide <= SLIDE_LIMITS[1], msg=f"slide {slide} out of range")
         self.assertLessEqual(place_slide, SLIDE_LIMITS[1] - 0.02, "place slide needs margin at the L1 depth")
+        self.assertGreater(TASK3_APPROACH_Z_M, 0.70)
+        self.assertLess(TASK3_APPROACH_Z_M, 1.00)
+        self.assertTrue(approach_clears_packaging(TASK3_APPROACH_Z_M))
+        self.assertTrue(place_is_l1_layer(INSTRUCTION_PLACE_WORLD[2]))
+        self.assertFalse(place_is_l1_layer(TASK3_APPROACH_Z_M))
+        from task3_cube_top_shelf_place_check import SHELF_L2_BOARD_Z, held_bottom_z
+        self.assertLess(held_bottom_z(TASK3_APPROACH_Z_M), SHELF_L2_BOARD_Z)
+
+    def test_place_left_of_detected_packaging_is_same_layer_south(self):
+        derived = place_left_of_obstacle(PACKAGING_WORLD)
+        self.assertAlmostEqual(derived[0], INSTRUCTION_PLACE_WORLD[0], places=2)
+        self.assertLess(derived[1], PACKAGING_WORLD[1])
+        self.assertAlmostEqual(derived[2], INSTRUCTION_PLACE_WORLD[2], places=2)
+        self.assertAlmostEqual(nearest_shelf_board_z(PACKAGING_WORLD[2]), 0.403)
+        self.assertAlmostEqual(TASK3_HOLD_HALF_M, 0.105)
+        self.assertGreater(TASK3_HOLD_SQUEEZE_RAD, 0.04)
+
+    def test_apply_detects_obstacle_then_squeezes_from_contact(self):
+        source = inspect.getsource(main)
+        self.assertIn("locate_packaging", source)
+        self.assertIn("place_left_of_obstacle", source)
+        self.assertIn("local_carry_hold", source)
+        self.assertNotIn("inward_hold_from_blocked", source)
+
+    def test_apply_lowers_to_l1_after_south_before_release(self):
+        source = inspect.getsource(main)
+        south_at = source.find("shelf_approach_face_south")
+        lower_at = source.find('phase = "place_lower"')
+        release_at = source.find('phase = "release"')
+        self.assertGreater(south_at, 0)
+        self.assertGreater(lower_at, south_at)
+        self.assertGreater(release_at, lower_at)
+        self.assertIn("place_layer_z_m", source)
+        self.assertNotIn("pre_lower_estimated_place_world", source)
 
     def test_contact_clearance_schedule_ends_at_zero(self):
         self.assertEqual(contact_clearance_schedule(0.02, 0.01), [0.02, 0.01, 0.0])
@@ -155,6 +233,106 @@ class Task3CubeTopShelfPlaceCheckTests(unittest.TestCase):
         self.assertGreaterEqual(lift_at, 0)
         self.assertIn("lift_slide", source[lift_at:lift_at + 200])
         self.assertLess(source.find("held_center_base"), source.find("return context"))
+
+    def test_cube_top_hold_squeezes_inward_instead_of_locking_open_gap(self):
+        source = inspect.getsource(_establish_cube_top_hold)
+        squeeze_at = source.find("local_carry_hold")
+        open_lock = source.find('hold_left = np.asarray(plan["left_joint_target"]')
+        self.assertGreaterEqual(squeeze_at, 0)
+        self.assertEqual(open_lock, -1)
+        self.assertIn("close_to_hold_gap", source)
+        self.assertIn("level_hold_pose", source)
+        self.assertIn("TASK3_HOLD_SQUEEZE_RAD", source)
+        self.assertIn("MAX_HOLD_PALM_DZ_M", source)
+
+    def test_open_corner_graze_is_not_treated_as_a_side_hold(self):
+        slide = 0.2742
+        left = np.array([0.00299, -0.92967, 0.57138, -1.52685, -1.12736, 1.59393])
+        right = np.array([-0.00377, -1.10212, 0.59878, 1.52954, 1.26854, -1.60072])
+        metrics = hold_palm_metrics(slide, left, right)
+        self.assertGreater(metrics["half_span_m"], 0.122)
+        self.assertFalse(metrics["level_enough"])
+
+    def test_apply_backs_away_before_hugging_from_a_stale_station(self):
+        source = inspect.getsource(main)
+        self.assertIn("should_backup_to_observe", source)
+        self.assertIn("refusing the nominal cube-top", source)
+
+    def test_aisle_insert_clears_the_south_stall_line(self):
+        held = np.array([0.57, 0.026, 0.85])
+        stand = place_stand_from_goal(INSTRUCTION_PLACE_WORLD, PLACE_YAW, held)
+        stage, insert = aisle_staging_from_stand(stand, PLACE_YAW)
+        plan = aligned_shelf_insert_plan(stand, place_yaw=PLACE_YAW)
+        self.assertAlmostEqual(insert[1], SHELF_AISLE_Y_M)
+        self.assertAlmostEqual(stage[1], SHELF_AISLE_Y_M)
+        self.assertGreater(stage[0], insert[0])
+        np.testing.assert_allclose(plan["insert_xy"], insert)
+        due_west_y = insert_line_y_at_x([-1.58, 0.59], stand, APPROACH_STALL_X_M)
+        self.assertLess(due_west_y, 0.62)
+        stall_y = insert_line_y_at_x(stage[:2], insert, APPROACH_STALL_X_M)
+        self.assertAlmostEqual(stall_y, SHELF_AISLE_Y_M, places=6)
+        self.assertLessEqual(insert[0], APPROACH_STALL_X_M)
+        self.assertTrue(plan["needs_south_shift"])
+        self.assertAlmostEqual(abs(plan["west_yaw"]), math.pi)
+        self.assertAlmostEqual(plan["south_bearing"], -math.pi / 2, places=2)
+        diagonal = approach_bearing(stage[:2], stand)
+        self.assertLess(diagonal, -2.4)
+        self.assertGreater(diagonal, -3.0)
+        self.assertLess(PLACE_ALIGN_YAW_TOLERANCE_RAD, 0.08)
+
+    def test_apply_uses_west_then_south_insert(self):
+        source = inspect.getsource(main)
+        self.assertIn("aligned_shelf_insert_plan", source)
+        self.assertIn("shelf_approach_west", source)
+        self.assertIn("shelf_approach_face_south", source)
+        self.assertIn("shelf_approach_square_west", source)
+
+    def test_tight_confirmed_squeeze_is_still_a_side_hold(self):
+        slide = 0.2742
+        sagged_left = np.array([0.01313, -0.97776, 0.56319, -1.53468, -1.06688, 1.59804])
+        sagged_right = np.array([-0.01792, -1.19683, 0.59025, 1.54584, 1.26125, -1.61089])
+        before = hold_palm_metrics(slide, sagged_left, sagged_right)
+        self.assertGreaterEqual(before["half_span_m"], 0.075)
+        self.assertLess(before["half_span_m"], 0.10)
+        self.assertLessEqual(abs(before["dz_m"]), 0.008)
+        self.assertTrue(before["level_enough"])
+
+    def test_level_hold_equalizes_palm_height_without_narrowing_past_the_side_faces(self):
+        slide = 0.2742
+        sagged_left = np.array([0.01313, -0.97776, 0.56319, -1.53468, -1.06688, 1.59804])
+        sagged_right = np.array([-0.01792, -1.19683, 0.59025, 1.54584, 1.26125, -1.61089])
+        before = hold_palm_metrics(slide, sagged_left, sagged_right)
+        self.assertLess(before["half_span_m"], 0.10)
+        plan = level_hold_pose(slide, sagged_left, sagged_right, TASK1_HOLD_HALF_M)
+        after = hold_palm_metrics(
+            slide, plan["left_joint_target"], plan["right_joint_target"],
+        )
+        self.assertLessEqual(abs(after["dz_m"]), 1e-5)
+        self.assertAlmostEqual(after["half_span_m"], TASK1_HOLD_HALF_M, places=3)
+        self.assertTrue(after["level_enough"])
+
+    def test_cube_top_hold_relevels_only_when_palms_are_uneven(self):
+        source = inspect.getsource(_establish_cube_top_hold)
+        self.assertIn('abs(result["hold_palms_after_squeeze"]["dz_m"]) > MAX_HOLD_PALM_DZ_M', source)
+        self.assertNotIn('if not result["hold_palms_after_squeeze"]["level_enough"]', source)
+
+    def test_capped_hold_keeper_refreshes_at_most_once(self):
+        reached_left = np.array([0.00554, -1.29823, 1.13427, -1.52135, -0.99482, 1.57636])
+        reached_right = np.array([-0.00902, -1.10025, 1.05938, 1.51400, 0.85419, -1.56986])
+        from task2_shelf_to_table_check import local_carry_hold
+        old_left, old_right = local_carry_hold(reached_left, reached_right)
+        settled_left = reached_left + 0.65 * (old_left - reached_left)
+        settled_right = reached_right + 0.65 * (old_right - reached_right)
+        context = {}
+        result = {}
+        keeper = _bind_capped_hold_keeper(context, result, max_refresh=1)
+        new_left, new_right, first = keeper(settled_left, settled_right, old_left, old_right)
+        self.assertTrue(first.get("hold_refreshed"))
+        self.assertEqual(result["hold_refresh_count"], 1)
+        locked_left, locked_right, second = keeper(settled_left, settled_right, old_left, old_right)
+        self.assertFalse(second.get("hold_refreshed"))
+        np.testing.assert_allclose(locked_left, old_left)
+        np.testing.assert_allclose(locked_right, old_right)
 
 
 if __name__ == "__main__":

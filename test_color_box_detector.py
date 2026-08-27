@@ -20,12 +20,13 @@ class ColorBoxDetectorTests(unittest.TestCase):
         image = np.full((480, 640, 3), (160, 124, 83), dtype=np.uint8)
         self.assertEqual(detect_colored_boxes(image, "brown", min_area=60), [])
 
-    def test_detects_compact_yellow_box_without_orange_table(self):
-        image = np.full((480, 640, 3), (162, 124, 83), dtype=np.uint8)
-        image[180:260, 300:390] = (252, 230, 100)
-        detections = detect_colored_boxes(image, "yellow", min_area=60)
+    def test_detects_compact_white_packaging_box(self):
+        image = np.full((480, 640, 3), (40, 40, 40), dtype=np.uint8)
+        image[200:280, 310:400] = (240, 240, 238)
+        detections = detect_colored_boxes(image, "white", min_area=60)
         self.assertEqual(len(detections), 1)
-        self.assertEqual(detections[0].bbox, (300, 180, 390, 260))
+        self.assertEqual(detections[0].color, "white")
+        self.assertEqual(detections[0].bbox, (310, 200, 400, 280))
 
 
 if __name__ == "__main__":

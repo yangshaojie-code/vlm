@@ -24,19 +24,30 @@ from task3_cube_top_shelf_place_check import (
     PLACE_RADIUS_M,
     PLACE_YAW,
     PLACE_ALIGN_YAW_TOLERANCE_RAD,
+    PLACE_INSERT_YAW_TOLERANCE_RAD,
+    TASK3_MAX_PLACE_OUTWARD_M,
+    TASK3_PLACE_REMAINING_OK_M,
     SHELF_AISLE_Y_M,
+    SHELF_POST_HALF_M,
+    SHELF_POST_LOCAL_Y_M,
     STATION_Y_MAX,
     PACKAGING_WORLD,
     TASK3_GRASP_FWD_OFFSET_M,
     TASK3_GRASP_Z_OFFSET_M,
     TASK3_HOLD_HALF_M,
+    TASK3_HOLD_LINEAR_SPEED,
     TASK3_HOLD_SQUEEZE_RAD,
     TASK3_LIFT_HEIGHT_M,
+    TASK3_RELEASE_OPEN_RAD,
+    TASK3_RELEASE_SPREAD_M,
+    TASK3_RELEASE_WITHDRAW_M,
     TASK3_SHELF_LINEAR_SPEED,
+    TASK3_TABLE_LEAVE_LINEAR_SPEED,
     TASK3_STANDOFF_M,
     YELLOW_FIXED_WORLD,
     _bind_capped_hold_keeper,
     _establish_cube_top_hold,
+    _recover,
     aisle_staging_from_stand,
     aligned_shelf_insert_plan,
     approach_bearing,
@@ -46,7 +57,10 @@ from task3_cube_top_shelf_place_check import (
     cubby_fits_l1,
     hold_palm_metrics,
     insert_line_y_at_x,
+    l1_clear_bay_y,
+    l1_release_cartesian,
     level_hold_pose,
+    local_release_open,
     lift_clears_cube,
     main,
     nearest_shelf_board_z,
@@ -56,14 +70,11 @@ from task3_cube_top_shelf_place_check import (
     shelf_inward_ok,
     snap_cube_top_center,
     snap_packaging_center,
-    l1_pole_clear_hold_plan,
-    right_only_carry_hold_ok,
     south_then_west_insert_plan,
     station_for_yellow,
     task3_placement_error,
     validate_place_world_l1,
     validate_yellow_world,
-    west_insert_clears_south_post,
 )
 
 
@@ -162,9 +173,18 @@ class Task3CubeTopShelfPlaceCheckTests(unittest.TestCase):
 
     def test_place_left_of_detected_packaging_is_same_layer_south(self):
         derived = place_left_of_obstacle(PACKAGING_WORLD)
+        post_inner_y = SHELF_AISLE_Y_M - SHELF_POST_LOCAL_Y_M + SHELF_POST_HALF_M
+        packaging_south_y = PACKAGING_WORLD[1] - 0.051
+        bay_mid_y = l1_clear_bay_y(PACKAGING_WORLD[1])
         self.assertAlmostEqual(derived[0], INSTRUCTION_PLACE_WORLD[0], places=2)
-        self.assertAlmostEqual(derived[1], INSTRUCTION_PLACE_WORLD[1], delta=0.02)
-        self.assertLess(derived[1], PACKAGING_WORLD[1])
+        self.assertAlmostEqual(bay_mid_y, 0.5 * (post_inner_y + packaging_south_y))
+        self.assertAlmostEqual(derived[1], bay_mid_y)
+        self.assertGreater(derived[1], post_inner_y)
+        self.assertLess(derived[1], packaging_south_y)
+        self.assertLess(
+            abs(derived[1] - INSTRUCTION_PLACE_WORLD[1]),
+            PLACE_RADIUS_M,
+        )
         self.assertAlmostEqual(derived[2], INSTRUCTION_PLACE_WORLD[2], places=2)
         self.assertAlmostEqual(nearest_shelf_board_z(PACKAGING_WORLD[2]), 0.403)
         self.assertAlmostEqual(TASK3_HOLD_HALF_M, 0.115)
@@ -230,6 +250,45 @@ class Task3CubeTopShelfPlaceCheckTests(unittest.TestCase):
         hanging = shelf_inward_ok(np.array([-2.55, 0.54, 0.498]), INSTRUCTION_PLACE_WORLD)
         self.assertFalse(hanging["deep_enough"])
         self.assertGreater(hanging["outward_m"], 0.10)
+        self.assertAlmostEqual(TASK3_MAX_PLACE_OUTWARD_M, 0.06)
+        almost = shelf_inward_ok(np.array([-2.636, 0.578, 0.530]), np.array([-2.68, 0.5685, 0.498]))
+        self.assertTrue(almost["deep_enough"])
+        almost_xy = task3_placement_error(
+            np.array([-2.636, 0.578, 0.530]),
+            np.array([-2.68, 0.5685, 0.498]),
+            PLACE_ACCEPT_RADIUS_M,
+        )
+        self.assertTrue(almost_xy["within_radius"])
+        self.assertLessEqual(0.047, TASK3_PLACE_REMAINING_OK_M)
+
+    def test_l1_release_opens_wider_than_the_box_then_base_backs_out(self):
+        left = np.array([0.01, -0.98, 0.56, -1.53, -1.07, 1.60])
+        right = np.array([-0.01, -1.19, 0.59, 1.54, 1.26, -1.61])
+        open_left, open_right = local_release_open(left, right)
+        self.assertAlmostEqual(open_left[1], left[1] + TASK3_RELEASE_OPEN_RAD)
+        self.assertAlmostEqual(open_right[1], right[1] + TASK3_RELEASE_OPEN_RAD)
+        self.assertAlmostEqual(TASK3_RELEASE_SPREAD_M, 0.04)
+        self.assertAlmostEqual(TASK3_RELEASE_WITHDRAW_M, 0.04)
+        last_left = np.array([0.586, 0.098, 0.503])
+        last_right = np.array([0.584, -0.080, 0.502])
+        too_tight = last_left[1] - last_right[1]
+        self.assertLess(too_tight, 2 * 0.12)
+        opened_left, opened_right = l1_release_cartesian(last_left, last_right)
+        self.assertGreater(opened_left[1] - opened_right[1], 2 * 0.12)
+        self.assertAlmostEqual(opened_left[0], last_left[0] - TASK3_RELEASE_WITHDRAW_M)
+        self.assertAlmostEqual(opened_right[0], last_right[0] - TASK3_RELEASE_WITHDRAW_M)
+        source = inspect.getsource(main)
+        release_at = source.find('phase = "release"')
+        retreat_at = source.find('phase = "shelf_retreat"')
+        retract_at = source.find('phase = "retract"')
+        self.assertGreater(release_at, 0)
+        self.assertGreater(retreat_at, release_at)
+        self.assertGreater(retract_at, retreat_at)
+        self.assertIn("l1_release_joints", source)
+        self.assertIn("recovery_released_on_shelf", inspect.getsource(_recover))
+        self.assertGreaterEqual(TASK3_HOLD_LINEAR_SPEED, 0.18)
+        self.assertGreaterEqual(TASK3_SHELF_LINEAR_SPEED, 0.12)
+        self.assertGreaterEqual(TASK3_TABLE_LEAVE_LINEAR_SPEED, 0.16)
 
     def test_yellow_hug_window_from_station(self):
         box_base = np.array([0.56, -0.01, 1.004])
@@ -283,8 +342,9 @@ class Task3CubeTopShelfPlaceCheckTests(unittest.TestCase):
         self.assertTrue(plan["needs_south_shift"])
         self.assertAlmostEqual(abs(plan["west_yaw"]), math.pi)
         self.assertAlmostEqual(plan["south_bearing"], -math.pi / 2, places=2)
-        self.assertGreater(TASK3_SHELF_LINEAR_SPEED, 0.08)
+        self.assertGreater(TASK3_SHELF_LINEAR_SPEED, 0.12)
         self.assertLess(PLACE_ALIGN_YAW_TOLERANCE_RAD, 0.08)
+        self.assertLess(PLACE_INSERT_YAW_TOLERANCE_RAD, PLACE_ALIGN_YAW_TOLERANCE_RAD)
 
     def test_apply_uses_south_then_west_insert(self):
         source = inspect.getsource(main)
@@ -292,44 +352,11 @@ class Task3CubeTopShelfPlaceCheckTests(unittest.TestCase):
         self.assertIn("shelf_approach_south", source)
         self.assertIn("shelf_approach_west", source)
         self.assertIn("shelf_approach_square_west", source)
-        self.assertIn("l1_pole_clear_hold_plan", source)
-        self.assertIn("l1_south_arm_tuck", source)
+        self.assertIn("PLACE_INSERT_YAW_TOLERANCE_RAD", source)
+        self.assertIn("l1_clear_bay_y", inspect.getsource(place_left_of_obstacle))
+        self.assertNotIn("l1_pole_clear_hold_plan", source)
+        self.assertNotIn("l1_south_arm_tuck", source)
         self.assertNotIn("shelf_approach_west_then_south", source)
-
-    def test_hug_forearm_hits_the_l1_south_post_during_west_insert(self):
-        slide = 0.7707382042683321
-        left = np.array([0.0033283099173145227, -0.9835322225064707, 0.39888442083839326,
-                         -1.529927894702984, -1.2998162438016632, 1.6019550472473616])
-        self.assertFalse(
-            west_insert_clears_south_post(
-                [-1.62, 0.557], [-2.15, 0.557], PLACE_YAW, slide, left,
-            )
-        )
-
-    def test_tucked_south_arm_clears_the_l1_south_post(self):
-        slide = 0.7707382042683321
-        left = np.array([0.0033283099173145227, -0.9835322225064707, 0.39888442083839326,
-                         -1.529927894702984, -1.2998162438016632, 1.6019550472473616])
-        right = np.array([-0.003774715651016508, -1.0869220383332694, 0.4204095372736745,
-                          1.5310576059864058, 1.3816646744736039, -1.6056096288290997])
-        tuck = l1_pole_clear_hold_plan(slide, left, right)
-        self.assertLess(float(tuck["compact_elbow_xyz"][1]), 0.28)
-        from motion_planning import MMK2KdlBackend
-        backend = MMK2KdlBackend()
-        before = backend.forward("r", slide, right)[:3, 3]
-        after = backend.forward("r", slide, tuck["compact_right"])[:3, 3]
-        np.testing.assert_allclose(after, before, atol=1e-3)
-        self.assertTrue(
-            west_insert_clears_south_post(
-                [-1.62, 0.557], [-2.15, 0.557], PLACE_YAW, slide, tuck["compact_left"],
-            )
-        )
-        contact = right_only_carry_hold_ok(
-            tuck["compact_left"], tuck["compact_right"],
-            tuck["compact_left"], tuck["compact_right"],
-        )
-        self.assertTrue(contact["right_only"])
-        self.assertLessEqual(contact["left_max_joint_residual_rad"], 1e-6)
 
     def test_tight_confirmed_squeeze_is_still_a_side_hold(self):
         slide = 0.2742

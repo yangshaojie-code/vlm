@@ -31,8 +31,6 @@ from task1_bimanual_approach_campaign import (
 )
 from task1_pick_lift_check import (
     APPROACH_JOINT_TOLERANCE_RAD,
-    CONTACT_MAX_JOINT_RESIDUAL_RAD,
-    CONTACT_MIN_JOINT_RESIDUAL_RAD,
     RETRACTION_JOINT_TOLERANCE_RAD,
     TASK1_APPROACH_HALF_M,
     TASK1_HOLD_HALF_M,
@@ -41,7 +39,6 @@ from task1_pick_lift_check import (
     carry_hold_ok,
     contact_approach_geometry,
     contact_clearance_schedule,
-    contact_residuals,
     hug_moved_from_pregrasp,
     lift_slide_target,
 )
@@ -66,7 +63,6 @@ from task1_shelf_place_check import (
     DEFAULT_NAV_TIMEOUT_SEC,
     DEFAULT_SHELF_TIMEOUT_SEC,
     DEFAULT_YAW_TIMEOUT_SEC,
-    MAX_PLACE_OUTWARD_M,
     MAX_STAGING_NAV_M,
     SHELF_RETREAT_M,
     SHELF_ZONE_X_MAX,
@@ -130,24 +126,25 @@ SHELF_L2_BOARD_Z = 0.732
 L2_CLEARANCE_M = 0.08
 L1_BOARD_CLEARANCE_M = 0.04
 TASK3_APPROACH_Z_M = float(SHELF_L2_BOARD_Z - L2_CLEARANCE_M - BOX_HALF_HEIGHT_M)
+# Last pass used 0.02 m/side. Palms ended 0.218 m apart on a 0.24 m box, so
+# retreat dragged it out. 0.04 m/side clears the faces; a small -X withdraw
+# also slides the fingertips off the wrap before the base backs out.
 TASK3_RELEASE_SPREAD_M = 0.04
+TASK3_RELEASE_WITHDRAW_M = 0.04
+TASK3_RELEASE_OPEN_RAD = 0.10
+TASK3_MAX_PLACE_OUTWARD_M = 0.06
+TASK3_PLACE_REMAINING_OK_M = 0.06
 TASK3_STANDOFF_M = 0.50
 TASK3_HOLD_HALF_M = 0.115
 TASK3_HOLD_SQUEEZE_RAD = 0.05
-TASK3_HOLD_LINEAR_SPEED = 0.16
-TASK3_SHELF_LINEAR_SPEED = 0.10
+TASK3_HOLD_LINEAR_SPEED = 0.20
+TASK3_SHELF_LINEAR_SPEED = 0.14
+TASK3_TABLE_LEAVE_LINEAR_SPEED = 0.18
 SHELF_AISLE_Y_M = 0.778
 APPROACH_STALL_X_M = -1.83
-# Shelf body (-2.67, 0.778); front-south post is the L1 left-cell gate.
-SHELF_BODY_XY = np.array([-2.67, 0.778], dtype=float)
-SHELF_FRONT_SOUTH_POST_XY = SHELF_BODY_XY + np.array([0.185, -0.388], dtype=float)
-SHELF_POST_HALF_M = 0.02
-ARM_FOREARM_RADIUS_M = 0.035
-# Facing west, robot left is world south.  The hug elbows flare to |y|≈0.41 m
-# and sweep that post.  Compact the south arm in the aisle before inserting.
-L1_SOUTH_ARM_HIGH_TCP = np.array([0.50, 0.16, 0.80], dtype=float)
-L1_SOUTH_ARM_COMPACT_TCP_XY = np.array([0.30, 0.10], dtype=float)
 PLACE_ALIGN_YAW_TOLERANCE_RAD = 0.05
+# 0.05 left square-west ~2.7° south of west; that drives the south arm into the post.
+PLACE_INSERT_YAW_TOLERANCE_RAD = 0.02
 SOUTH_SHIFT_MIN_M = 0.08
 MAX_HOLD_REFRESH = 1
 # A confirmed squeeze often sits inside 0.115 m (palms on the 0.24 m faces).
@@ -162,6 +159,9 @@ OBSTACLE_HALF_Y_M = 0.051
 OBSTACLE_HALF_X_M = 0.09
 PLACE_LEFT_GAP_M = 0.06
 PLACE_SHELF_INSET_M = 0.05
+# MJCF shelf posts at local y=±0.388, half-size 0.02 m.
+SHELF_POST_LOCAL_Y_M = 0.388
+SHELF_POST_HALF_M = 0.02
 # The head camera sits ~0.35 m above the yellow box at the observe distance,
 # so a small extra pitch (the body already tilts -0.33) keeps it centered.
 OBSERVE_HEAD = (0.0, -0.10)
@@ -302,6 +302,28 @@ def validate_shelf_side_place(place_world) -> np.ndarray:
     return place
 
 
+def l1_clear_bay_y(
+    obstacle_y,
+    *,
+    direction: str = "left",
+    obstacle_half_y: float = OBSTACLE_HALF_Y_M,
+    aisle_y: float = SHELF_AISLE_Y_M,
+    post_span_y: float = SHELF_POST_LOCAL_Y_M,
+    post_half: float = SHELF_POST_HALF_M,
+) -> float:
+    """Mid-Y of the free gap between a corner post and the packaging box."""
+    if direction not in ("left", "right"):
+        raise ValueError("direction must be 'left' or 'right'")
+    aisle_y = float(aisle_y)
+    if direction == "left":
+        post_inner = aisle_y - float(post_span_y) + float(post_half)
+        obs_face = float(obstacle_y) - float(obstacle_half_y)
+    else:
+        post_inner = aisle_y + float(post_span_y) - float(post_half)
+        obs_face = float(obstacle_y) + float(obstacle_half_y)
+    return 0.5 * (post_inner + obs_face)
+
+
 def place_left_of_obstacle(
     obstacle_world,
     *,
@@ -312,21 +334,22 @@ def place_left_of_obstacle(
     gap: float = PLACE_LEFT_GAP_M,
     inset: float = PLACE_SHELF_INSET_M,
 ) -> np.ndarray:
-    """World center that puts the held carton on the obstacle's left, same shelf layer.
+    """World center in the open bay left of the obstacle, same shelf layer.
 
-    The robot faces west into the cabinet, so left is south (-Y).  Height comes
-    from the board under the detected obstacle, not from a hardcoded L1 z.
+    The robot faces west, so left is south (-Y).  Y is the midpoint between
+    the south post's inner face and the packaging's south face, not a tight
+    squeeze against the post.  Height comes from the board under the obstacle.
     """
+    del gap, box_half_y
     obs = np.asarray(obstacle_world, dtype=float)
     if obs.shape != (3,) or not np.all(np.isfinite(obs)):
         raise ValueError("obstacle_world must be a finite 3-vector")
     if direction not in ("left", "right"):
         raise ValueError("direction must be 'left' or 'right'")
     board = nearest_shelf_board_z(obs[2])
-    sign = -1.0 if direction == "left" else 1.0
     place = np.array([
         float(obs[0]) - float(inset),
-        float(obs[1]) + sign * (float(obstacle_half_y) + float(box_half_y) + float(gap)),
+        l1_clear_bay_y(obs[1], direction=direction, obstacle_half_y=obstacle_half_y),
         float(board) + float(box_half_z),
     ], dtype=float)
     return validate_shelf_side_place(place)
@@ -365,158 +388,6 @@ def south_then_west_insert_plan(
         "needs_south_shift": shift_m >= float(south_shift_min),
         "south_shift_m": shift_m,
     }
-
-
-def arm_elbow_base_xyz(slide: float, joints, side: str) -> np.ndarray:
-    """Base-frame elbow (after arm joint 3) for the official MMK2 DH chain."""
-    from mmk2_kdl import MMK2Kdl
-
-    if side not in ("left", "right"):
-        raise ValueError("side must be 'left' or 'right'")
-    joints = np.asarray(joints, dtype=float)
-    if joints.shape != (6,) or not np.all(np.isfinite(joints)):
-        raise ValueError("arm joints must be a finite 6-vector")
-    kdl = MMK2Kdl(iteration=0)
-    arm = kdl.left_arm if side == "left" else kdl.right_arm
-    transform = kdl.spine.get_transformation_matrix(float(slide))
-    transform = transform @ kdl.spine2arm.get_transformation_matrix(side)
-    link = np.eye(4)
-    for index in range(3):
-        link = link @ arm.dh.adjacent_transform(float(joints[index]), index + 1)
-    return np.asarray((transform @ link)[:3, 3], dtype=float)
-
-
-def _yaw_rotate_xy(base_xy, yaw: float, local_xyz) -> np.ndarray:
-    local = np.asarray(local_xyz, dtype=float)[:2]
-    cosine, sine = math.cos(yaw), math.sin(yaw)
-    origin = np.asarray(base_xy, dtype=float)[:2]
-    return origin + np.array(
-        [cosine * local[0] - sine * local[1], sine * local[0] + cosine * local[1]],
-        dtype=float,
-    )
-
-
-def left_forearm_world_samples(base_xy, yaw: float, slide: float, left_joints, *, count: int = 10) -> np.ndarray:
-    """World xy samples along the left upper-arm-to-palm segment."""
-    backend = MMK2KdlBackend()
-    elbow = arm_elbow_base_xyz(slide, left_joints, "left")
-    palm = np.asarray(backend.forward("l", float(slide), left_joints)[:3, 3], dtype=float)
-    samples = []
-    for frac in np.linspace(0.0, 1.0, int(count)):
-        local = (1.0 - float(frac)) * elbow + float(frac) * palm
-        samples.append(_yaw_rotate_xy(base_xy, yaw, local))
-    return np.asarray(samples, dtype=float)
-
-
-def south_post_insert_clearance_m(
-    base_xy,
-    yaw: float,
-    slide: float,
-    left_joints,
-    post_xy=SHELF_FRONT_SOUTH_POST_XY,
-    post_half: float = SHELF_POST_HALF_M,
-    arm_radius: float = ARM_FOREARM_RADIUS_M,
-) -> float:
-    """Signed distance from the left forearm to the L1 front-south post."""
-    post = np.asarray(post_xy, dtype=float)[:2]
-    min_dist = None
-    for point in left_forearm_world_samples(base_xy, yaw, slide, left_joints):
-        dist = float(np.linalg.norm(point - post) - float(post_half) - float(arm_radius))
-        min_dist = dist if min_dist is None else min(min_dist, dist)
-    return float(min_dist)
-
-
-def west_insert_clears_south_post(
-    start_xy,
-    stand_xy,
-    yaw: float,
-    slide: float,
-    left_joints,
-    *,
-    min_clearance_m: float = 0.02,
-) -> bool:
-    """True when a due-west chassis creep keeps the left forearm off the south post."""
-    start = np.asarray(start_xy, dtype=float)[:2]
-    stand = np.asarray(stand_xy, dtype=float)[:2]
-    if float(start[0]) <= float(stand[0]):
-        raise ValueError("west insert must start east of the place stand")
-    for base_x in np.linspace(float(start[0]), float(stand[0]), 24):
-        clearance = south_post_insert_clearance_m(
-            [base_x, float(stand[1])], yaw, slide, left_joints,
-        )
-        if clearance < float(min_clearance_m):
-            return False
-    return True
-
-
-def l1_pole_clear_hold_plan(slide: float, left_joints, right_joints) -> dict:
-    """Lift the south arm over the carton, then fold it beside the chassis.
-
-    The right palm stays on the north face.  Facing west, robot-left is the
-    south flare that hits the L1 front-south post during insert.
-    """
-    left_joints = np.asarray(left_joints, dtype=float)
-    right_joints = np.asarray(right_joints, dtype=float)
-    backend = MMK2KdlBackend()
-    right_tcp = np.asarray(backend.forward("r", float(slide), right_joints)[:3, 3], dtype=float)
-    high = L1_SOUTH_ARM_HIGH_TCP.copy()
-    compact = np.array(
-        [L1_SOUTH_ARM_COMPACT_TCP_XY[0], L1_SOUTH_ARM_COMPACT_TCP_XY[1], float(right_tcp[2])],
-        dtype=float,
-    )
-    high_plan = solve_bimanual_pose(
-        slide, left_joints, right_joints, high, right_tcp, backend=backend,
-    )
-    compact_plan = solve_bimanual_pose(
-        slide,
-        high_plan["left_joint_target"],
-        high_plan["right_joint_target"],
-        compact,
-        right_tcp,
-        backend=backend,
-    )
-    compact_left = np.asarray(compact_plan["left_joint_target"], dtype=float)
-    compact_right = np.asarray(compact_plan["right_joint_target"], dtype=float)
-    elbow = arm_elbow_base_xyz(slide, compact_left, "left")
-    if float(elbow[1]) > 0.30:
-        raise ValueError(f"compact south elbow still flared: {elbow.tolist()}")
-    return {
-        "high_plan": high_plan,
-        "compact_plan": compact_plan,
-        "high_left": np.asarray(high_plan["left_joint_target"], dtype=float),
-        "high_right": np.asarray(high_plan["right_joint_target"], dtype=float),
-        "compact_left": compact_left,
-        "compact_right": compact_right,
-        "compact_elbow_xyz": elbow,
-        "compact_left_tcp": np.asarray(compact_plan["left_fk_position"], dtype=float),
-    }
-
-
-def right_only_carry_hold_ok(left_current, right_current, left_target, right_hold) -> dict:
-    """Hold check after the south arm has been folded off the carton."""
-    residual = contact_residuals(left_current, right_current, left_target, right_hold)
-    left = residual["left_max_joint_residual_rad"]
-    right = residual["right_max_joint_residual_rad"]
-    residual["holding"] = (
-        left <= CONTACT_MAX_JOINT_RESIDUAL_RAD
-        and CONTACT_MIN_JOINT_RESIDUAL_RAD <= right <= CONTACT_MAX_JOINT_RESIDUAL_RAD
-    )
-    residual["right_only"] = True
-    return residual
-
-
-def _bind_right_only_hold_keeper(context, result):
-    """Keep the tucked south arm and the north-face hold; do not restore the hug."""
-
-    def keeper(left_current, right_current, left_hold, right_hold):
-        contact = right_only_carry_hold_ok(left_current, right_current, left_hold, right_hold)
-        return (
-            np.asarray(left_hold, dtype=float),
-            np.asarray(right_hold, dtype=float),
-            contact,
-        )
-
-    return keeper
 
 
 def snap_packaging_center(obstacle_world) -> np.ndarray:
@@ -712,7 +583,7 @@ def box_inside_place_radius(base_pose, held_center_base, place_world, place_radi
     return error
 
 
-def shelf_inward_ok(held_world, place_world, max_outward_m: float = MAX_PLACE_OUTWARD_M) -> dict:
+def shelf_inward_ok(held_world, place_world, max_outward_m: float = TASK3_MAX_PLACE_OUTWARD_M) -> dict:
     """True when the box is not still hanging off the west-facing shelf lip."""
     held = np.asarray(held_world, dtype=float)
     place = validate_shelf_side_place(place_world)
@@ -726,6 +597,73 @@ def shelf_inward_ok(held_world, place_world, max_outward_m: float = MAX_PLACE_OU
         "outward_m": outward,
         "deep_enough": outward <= limit,
     }
+
+
+def local_release_open(hold_left, hold_right, open_rad: float = TASK3_RELEASE_OPEN_RAD):
+    """Open the hug at j2 without a new Cartesian solve that can flare into the posts."""
+    left = np.asarray(hold_left, dtype=float).copy()
+    right = np.asarray(hold_right, dtype=float).copy()
+    open_rad = float(open_rad)
+    if left.shape != (6,) or right.shape != (6,):
+        raise ValueError("release-open vectors must be six-joint arrays")
+    if not 0.04 <= open_rad <= 0.12:
+        raise ValueError("release-open must stay a small unpinch, not a full arm spread")
+    left[1] += open_rad
+    right[1] += open_rad
+    return left, right
+
+
+def l1_release_cartesian(
+    left_position,
+    right_position,
+    *,
+    spread: float = TASK3_RELEASE_SPREAD_M,
+    withdraw: float = TASK3_RELEASE_WITHDRAW_M,
+):
+    """Open the L1 hug wider than the carton and pull the fingertips off the wrap."""
+    left = np.asarray(left_position, dtype=float)
+    right = np.asarray(right_position, dtype=float)
+    spread = float(spread)
+    withdraw = float(withdraw)
+    if left.shape != (3,) or right.shape != (3,) or not np.all(np.isfinite([left, right])):
+        raise ValueError("release Cartesian targets must be finite 3-vectors")
+    if not 0.03 <= spread <= 0.06:
+        raise ValueError("L1 release spread must stay inside the post/packaging bay")
+    if not 0.02 <= withdraw <= 0.06:
+        raise ValueError("L1 release withdraw is out of range")
+    return (
+        left + np.array([-withdraw, spread, 0.0]),
+        right + np.array([-withdraw, -spread, 0.0]),
+    )
+
+
+def l1_release_joints(slide, hold_left, hold_right, spread: float = TASK3_RELEASE_SPREAD_M):
+    """Unpinch in the L1 bay. Prefer spread+withdraw; fall back to Y-only, then j2."""
+    backend = MMK2KdlBackend()
+    hold_left = np.asarray(hold_left, dtype=float)
+    hold_right = np.asarray(hold_right, dtype=float)
+    left_fk = backend.forward("l", float(slide), hold_left)
+    right_fk = backend.forward("r", float(slide), hold_right)
+    attempts = (
+        ("cartesian_withdraw", lambda: l1_release_cartesian(left_fk[:3, 3], right_fk[:3, 3], spread=spread)),
+        ("cartesian", lambda: release_cartesian(left_fk[:3, 3], right_fk[:3, 3], spread)),
+    )
+    for how, builder in attempts:
+        try:
+            left_xyz, right_xyz = builder()
+            plan = solve_bimanual_pose(
+                float(slide), hold_left, hold_right, left_xyz, right_xyz, backend=backend,
+            )
+            return (
+                np.asarray(plan["left_joint_target"], dtype=float),
+                np.asarray(plan["right_joint_target"], dtype=float),
+                how,
+                plan,
+            )
+        except (ValueError, RuntimeError):
+            continue
+    left, right = local_release_open(hold_left, hold_right)
+    return left, right, "joint_open", None
 
 
 def locate_packaging(node, pick_yaw: float = PLACE_YAW):
@@ -887,7 +825,7 @@ def _drive_line_task3(
             if (
                 inside["within_radius"]
                 and depth["deep_enough"]
-                and details["remaining_m"] <= float(position_tolerance)
+                and details["remaining_m"] <= max(float(position_tolerance), TASK3_PLACE_REMAINING_OK_M)
             ):
                 node.controller.stop_base()
                 result[f"{key_prefix}_accepted_inside_radius"] = True
@@ -1185,7 +1123,51 @@ def _recover(node, context, args, result, start_base, phase: str, released: bool
     except Exception:
         current = None
     near_shelf = current is not None and float(current[0]) <= SHELF_ZONE_X_MAX
-    if holding and near_shelf:
+    on_shelf = False
+    if holding and near_shelf and context.get("held_center_base") is not None:
+        try:
+            inside = box_inside_place_radius(
+                current, context["held_center_base"], place_world, args.place_radius,
+            )
+            depth = shelf_inward_ok(inside["held_world"], place_world)
+            result["recovery_estimated_place_world"] = inside["held_world"]
+            result["recovery_place_xy_error_m"] = inside["xy_error_m"]
+            result["recovery_place_outward_m"] = depth["outward_m"]
+            on_shelf = bool(inside["within_radius"] and depth["deep_enough"])
+        except Exception as exc:
+            result["recovery_place_check_error"] = str(exc)
+    if holding and near_shelf and on_shelf:
+        result["recovery_released_on_shelf"] = True
+        try:
+            current_slide = float(node.sensors.joint_vector(["slide_joint"])[0])
+            release_left, release_right, how, plan = l1_release_joints(
+                current_slide, context["hold_left"], context["hold_right"], args.release_spread,
+            )
+            result["recovery_release_mode"] = how
+            if plan is not None:
+                result["recovery_release_plan"] = plan
+            _traverse_pair(
+                node, context["hold_left"], context["hold_right"], release_left, release_right,
+                args.joint_max_step, args.settle_timeout, RETRACTION_JOINT_TOLERANCE_RAD,
+                args.gripper_open, args.gripper_open, True, result,
+            )
+            context["release_left"] = release_left
+            context["release_right"] = release_right
+            released = True
+            holding = False
+            _sleep_holding(node, 0.6, release_left, release_right, args.gripper_open, require_hold=False)
+            _drive_line_task3(
+                node, current, pose_offset(current, args.shelf_retreat, reverse=True), -1,
+                args.retreat_timeout, result, release_left, release_right, args.gripper_open,
+                require_hold=False, min_traveled_m=0.20, position_tolerance=0.06,
+                max_linear_speed=TASK3_HOLD_LINEAR_SPEED,
+                key_prefix="recovery_released_retreat",
+            )
+            result["recovery_released_retreat_completed"] = True
+        except Exception as exc:
+            result["recovery_released_on_shelf_error"] = str(exc)
+            result["recovery_skipped_pull_out"] = True
+    elif holding and near_shelf:
         result["recovery_kept_hold"] = True
         try:
             _drive_line_task3(
@@ -1208,7 +1190,7 @@ def _recover(node, context, args, result, start_base, phase: str, released: bool
             _drive_line_task3(
                 node, current, start_base, 1, args.table_leave_timeout, result,
                 context["hold_left"], context["hold_right"], args.gripper_open,
-                require_hold=True, max_linear_speed=0.08, key_prefix="recovery_return",
+                require_hold=True, max_linear_speed=TASK3_TABLE_LEAVE_LINEAR_SPEED, key_prefix="recovery_return",
             )
             current_slide = float(node.sensors.joint_vector(["slide_joint"])[0])
             _traverse_spine_holding(
@@ -1219,14 +1201,14 @@ def _recover(node, context, args, result, start_base, phase: str, released: bool
             result["recovery_lowered_before_retract"] = True
         except Exception as exc:
             result["recovery_table_error"] = str(exc)
-    elif released and near_shelf and current is not None:
+    elif released and near_shelf and current is not None and not result.get("recovery_released_retreat_completed"):
         try:
             _drive_line_task3(
                 node, current, pose_offset(current, args.shelf_retreat, reverse=True), -1,
                 args.retreat_timeout, result,
                 context.get("release_left", context.get("hold_left")),
                 context.get("release_right", context.get("hold_right")), args.gripper_open,
-                require_hold=False, min_traveled_m=0.20, max_linear_speed=TASK3_SHELF_LINEAR_SPEED,
+                require_hold=False, min_traveled_m=0.20, max_linear_speed=TASK3_HOLD_LINEAR_SPEED,
                 key_prefix="recovery_released_retreat",
             )
             result["recovery_released_retreat_completed"] = True
@@ -1514,7 +1496,7 @@ def main(argv=None) -> int:
             result["phase"] = phase
             _navigate(
                 node, station, 0.04, 0.03, args.nav_timeout, MAX_STATION_NAV_M,
-                0.16, 0.55, result,
+                TASK3_HOLD_LINEAR_SPEED, 0.60, result,
             )
             station_navigation = {
                 "final_base": result.get("final_base"),
@@ -1551,7 +1533,7 @@ def main(argv=None) -> int:
                 node, start_base, table_leave_target, -1, args.table_leave_timeout, result,
                 context["hold_left"], context["hold_right"], args.gripper_open,
                 require_hold=True, min_traveled_m=TABLE_LEAVE_MIN_TRAVELED_M,
-                max_linear_speed=0.12, key_prefix="table_leave",
+                max_linear_speed=TASK3_TABLE_LEAVE_LINEAR_SPEED, key_prefix="table_leave",
             )
             result["table_leave_final_base"] = leave_final.tolist()
             result["table_leave_completed"] = True
@@ -1597,6 +1579,7 @@ def main(argv=None) -> int:
         _face_yaw_holding(
             node, place_yaw, args.yaw_timeout, result,
             context["hold_left"], context["hold_right"], args.gripper_open,
+            yaw_tolerance=PLACE_ALIGN_YAW_TOLERANCE_RAD,
             key_prefix="face_west", hold_keeper=keeper,
         )
 
@@ -1714,38 +1697,9 @@ def main(argv=None) -> int:
         _face_yaw_holding(
             node, insert_plan["west_yaw"], args.yaw_timeout, result,
             context["hold_left"], context["hold_right"], args.gripper_open,
-            yaw_tolerance=PLACE_ALIGN_YAW_TOLERANCE_RAD,
+            yaw_tolerance=PLACE_INSERT_YAW_TOLERANCE_RAD,
             key_prefix="shelf_approach_square_west", hold_keeper=keeper,
         )
-        phase = "l1_south_arm_tuck"
-        result["phase"] = phase
-        current_slide = float(node.sensors.joint_vector(["slide_joint"])[0])
-        tuck = l1_pole_clear_hold_plan(current_slide, context["hold_left"], context["hold_right"])
-        result["l1_south_arm_high_joints"] = {
-            "left": tuck["high_left"].tolist(), "right": tuck["high_right"].tolist(),
-        }
-        result["l1_south_arm_compact_joints"] = {
-            "left": tuck["compact_left"].tolist(), "right": tuck["compact_right"].tolist(),
-        }
-        result["l1_south_arm_compact_elbow_xyz"] = tuck["compact_elbow_xyz"].tolist()
-        _traverse_pair(
-            node, context["hold_left"], context["hold_right"],
-            tuck["high_left"], tuck["high_right"],
-            args.joint_max_step, args.settle_timeout, RETRACTION_JOINT_TOLERANCE_RAD,
-            args.gripper_open, args.gripper_open, True, result,
-        )
-        _traverse_pair(
-            node, tuck["high_left"], tuck["high_right"],
-            tuck["compact_left"], tuck["compact_right"],
-            args.joint_max_step, args.settle_timeout, RETRACTION_JOINT_TOLERANCE_RAD,
-            args.gripper_open, args.gripper_open, True, result,
-        )
-        context["hold_left"] = tuck["compact_left"]
-        context["hold_right"] = tuck["compact_right"]
-        result["l1_south_arm_tuck_completed"] = True
-        keeper = _bind_right_only_hold_keeper(context, result)
-        phase = "shelf_approach"
-        result["phase"] = phase
         west_start = _odom_pose(node)
         west_pose = np.array([place_stand_now[0], place_stand_now[1], insert_plan["west_yaw"]], dtype=float)
         if float(np.linalg.norm(west_start[:2] - place_stand_now)) > 0.03:
@@ -1853,19 +1807,12 @@ def main(argv=None) -> int:
         phase = "release"
         result["phase"] = phase
         current_slide = float(node.sensors.joint_vector(["slide_joint"])[0])
-        backend = MMK2KdlBackend()
-        left_fk = backend.forward("l", current_slide, context["hold_left"])
-        right_fk = backend.forward("r", current_slide, context["hold_right"])
-        left_release_xyz, right_release_xyz = release_cartesian(
-            left_fk[:3, 3], right_fk[:3, 3], args.release_spread,
+        release_left, release_right, release_mode, release_plan = l1_release_joints(
+            current_slide, context["hold_left"], context["hold_right"], args.release_spread,
         )
-        release_plan = solve_bimanual_pose(
-            current_slide, context["hold_left"], context["hold_right"],
-            left_release_xyz, right_release_xyz, backend=backend,
-        )
-        result["release_plan"] = release_plan
-        release_left = np.asarray(release_plan["left_joint_target"], dtype=float)
-        release_right = np.asarray(release_plan["right_joint_target"], dtype=float)
+        result["release_mode"] = release_mode
+        if release_plan is not None:
+            result["release_plan"] = release_plan
         _traverse_pair(
             node, context["hold_left"], context["hold_right"], release_left, release_right,
             args.joint_max_step, args.settle_timeout, RETRACTION_JOINT_TOLERANCE_RAD,
@@ -1887,7 +1834,7 @@ def main(argv=None) -> int:
             release_left, release_right, args.gripper_open,
             require_hold=False, min_traveled_m=max(0.20, args.shelf_retreat - 0.08),
             position_tolerance=0.06,
-            max_linear_speed=TASK3_SHELF_LINEAR_SPEED, key_prefix="shelf_retreat",
+            max_linear_speed=TASK3_HOLD_LINEAR_SPEED, key_prefix="shelf_retreat",
         )
         result["shelf_retreat_final_base"] = retreat_final.tolist()
         result["shelf_retreat_completed"] = True

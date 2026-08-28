@@ -1,6 +1,6 @@
 # 文旅搬运项目当前状态
 
-更新时间：2026-08-21  
+更新时间：2026-08-28  
 项目目录：`D:\taozhanbei\vlm_pipeline`
 
 这是最新交接入口。旧的 `AGENT_HANDOFF.md` 和 `vlm_pipeline/ROS2_INTEGRATION_LOG.md` 保留历史过程；若内容冲突，以本文件和 `vlm_pipeline/outputs` 中的真实采集结果为准。
@@ -12,18 +12,19 @@
 
 正式 ROS 2 协议、固定布局任务、RGB-D 格式、控制话题、场景尺寸、裁判阈值、官方运动学源码和机器人 MJCF 已经取得。已确认的正式参数集中在 `vlm_pipeline/COMPETITION_PARAMETERS.md`。
 
-当前阻塞项已收敛为 **Task 3 黄箱桌顶→货架包装箱左侧**。Task 1 货架放置和 Task 2 货架→桌面均已通过。正式执行器仍不得启用：
+Task 1（粉箱桌面→货架 L3）和 Task 2（棕箱 L2→桌面）独立校准均已真实通过。Task 3 独立脚本 `task3_cube_top_shelf_place_check.py` 放置配方已真实通过（含去掉进柜前内收之后的复验）。正式执行器仍不得启用：
 
 1. `motion_planning.py` 已使用项目内的官方 NumPy `MMK2Kdl/ArmKdl`，不再引用不存在的 `discoverse.robots.MMK2IK`；单臂、双臂 FK→IK→FK 和关节限位测试已通过。
 2. `head_camera_kinematics.py` 已根据 MJCF 和实时 slide/head JointState 注入 `base_link <- head_camera`；静态相机矩阵仅保留调试覆盖。
 3. `ros_mission_executor.py` 仍是安全禁用的单臂闭爪基线；不得绕过 `motion_ready=False` 发送正式动作。
 
-### 1.1 最近一次真实联调状态（2026-08-21）
+### 1.1 最近一次真实联调状态（2026-08-28）
 
-- **P3 货架放置 passed**（本局重跑后粉箱在 L3）。
-- **P4 Task 2 真实通过**（2026-08-21 09:42:32Z）。棕箱在桌面原粉箱槽附近，估计 `[-0.984, 2.275, 0.834]`，XY 误差 `0.076 m`（半径 `0.28 m`）。松手后收臂、倒车 `0.22 m`。粉箱仍在 L3，黄箱仍在白色方块顶。不要重启 Server。
-- **当前任务：Task 3。** 黄箱从桌面白色方块顶放到货架包装箱左侧 `[-2.68, 0.54, 0.498]`，半径 `0.24 m`。
-- `motion_ready=False` 仍是安全门。联调 `status=passed` 不等于本局 `/referee/score` 一定入账（600 s 可能已过）。
+- **当前任务：固定布局三任务连续闭环（P5）。** Task 1/2/3 独立 `--apply` 均已通过。黄箱现在在 L1，开局布局已变，P5 必须先重启 Server 再按 Task 1→2→3 连续跑，中途不要重启。
+- Task 3 放置配方见第 15 节：L1 南侧空档中点、正对柜子、南移后再西向插入、放到后再左右各张开 4 cm 并抽指 4 cm，然后倒车、收臂。
+- 成功报告：`outputs/task3_cube_top_shelf_place_check.json` 曾记 `08:33:13Z`、`08:42:45Z` 为 `passed`。去掉进柜前内收后，操作者又完整跑通一次（黄箱稳定留在 L1）。仓库里这份 JSON 可能仍停在 `08:51:59Z` 的失败记录，以现场通过为准。
+- 08:51 失败（`paired arms did not settle`）是进柜前把掌往回抽 4 cm 导致的，该内收已删除，不要再加回去。
+- `motion_ready=False` 仍是安全门。校准脚本 `status=passed` 不等于本局 `/referee/score` 入账。
 
 ## 2. 正式比赛约束
 
@@ -195,20 +196,19 @@ ROS Image frame: head_camera
 - 本地三色 HSV/几何检测。
 - 只读 `ros2_probe.py`。
 
-最近测试：
+最近测试（2026-08-28 主机）：
 
 ```text
 python -m unittest discover -v
-Ran 105 tests
+Ran 161 tests
 OK
 ```
 
 仍待完成：
 
-- Task 1 货架放置的首次真实 `--apply`（`task1_shelf_place_check.py` 已写好）。
-- `RosMissionExecutor` 的单臂、固定 top-down 姿态；正式任务一必须改为双臂 hug，任务二/三需要各自的已标定抓放策略。
-- 固定布局下 RGB-D 反投影到已知 pink/yellow/brown 世界坐标的绝对误差与坐标轴验证。
-- 受控真实 Server 动作测试：先单通道控制，再双臂接触/搬离 0.20 m、稳定放置、返回结束区，最后连续三任务与随机布局。
+- 固定布局三任务连续闭环（P5）：新开一局 Server，按 Task 1→2→3 连续跑，中途不重启。
+- `RosMissionExecutor` 的单臂、固定 top-down 姿态；正式任务一必须改为双臂 hug，任务二/三接入各自已标定脚本。
+- 受控真实 Server 动作测试：连续三任务、返回结束区、`MATERIAL_RANDOMIZE=1`。
 
 ## 10. 已取得参考文件
 
@@ -248,7 +248,7 @@ discoverse_python_files.txt
 
 ### P1：重写正式动作执行器
 
-当前仍禁止改 `motion_ready`。P3 已通过。当前做 Task 2 独立校准，再 Task 3，最后才把状态机接入 `RosMissionExecutor`。
+当前仍禁止改 `motion_ready`。P0–P4 与 Task 3 独立 `--apply` 均已通过。下一步是 P5 三任务连续闭环，最后才把状态机接入 `RosMissionExecutor`。
 
 1. 参考 `official_client_task_1_full.py` 的双臂 hug、slide 和安全倒车流程。
 2. 按任务位置选择桌面侧边、货架和桌面顶部抓取策略，不把固定 pink/brown/yellow 顺序写死。
@@ -295,4 +295,60 @@ kdl_parser_py: NOT INSTALLED
 - 期间一次 pick_lift 报 `paired arms did not settle`，属双臂在 0.02 m 接近位被箱体阻挡的停滞；`blocked_hug_lock` 机制可恢复，后续运行通过。
 - 新增 `task3_cube_top_shelf_place_check.py` 与 `test_task3_cube_top_shelf_place_check.py`：黄箱（白方体顶部 `[-0.54, 2.30, 1.004]`）抱持→抬离 0.10 m→倒退→面向西→货架 staging→降柱至 L1（place `[-2.68, 0.54, 0.498]`，包装盒左侧）→放置→撤臂，含 mid-run 抱持恢复与 vision/固定布局回退。主机全量回归 144 tests OK。
 - Task 3 首跑风险点：L1 放置需 slide 降至约 0.78（限位 0.87），为迄今最深降柱；黄箱目标格与包装盒边缘仅约 0.07 m，接近线横向偏差需受控。
-- 下一步：当前局先 task3 dry-run（无 `--apply`）核对 slide 链与站位，再 `--apply`；passed 后进入固定布局三任务连续闭环（P5），随后 P6 接入 `RosMissionExecutor`、P7 首次固定布局跑分。
+- 下一步当时是 Task 3 `--apply`。2026-08-28 已跑通放置配方，见第 15 节。
+
+## 15. Task 3 黄箱桌顶→货架 L1（2026-08-28）
+
+脚本：`task3_cube_top_shelf_place_check.py`。测试：`test_task3_cube_top_shelf_place_check.py`（30 项）。报告：`outputs/task3_cube_top_shelf_place_check.json`。
+
+### 15.1 几何
+
+```text
+黄箱布局中心     [-0.54, 2.30, 1.004]   白方块顶 z=0.909，箱半高 0.095
+抱持             grasp_fwd=0.06  grasp_z=0.0  hold_half=0.115
+                 KDL 原点是指尖/掌前缘；grasp_fwd=0 会把掌停在箱心，包不住侧面
+包装盒           [-2.63, 0.778, 0.530]  euler Rx=90°，世界 Y 半宽是局部 Z 半宽 0.051 m
+货架立柱         相对货架中心局部 y=±0.388，半宽 0.02 m
+南侧前柱世界     约 (-2.485, 0.390)，内侧（北）面 y≈0.410
+包装南面         y≈0.727
+L1 南侧空档中点  y≈0.5685（指令点 y=0.54，仍在半径 0.24 m 内）
+实际 place_world [-2.68, 0.5685, 0.498]
+L1 巡航高度      held z = 0.732 - 0.08 - 0.095 = 0.557（从 L2 板下钻，不能飞越包装）
+```
+
+插入路径：先在柜前南移到放置站 Y，再正西插入 L1。西向插入前朝向误差 ≤ 0.02 rad（约 1.1°）；0.05 rad 会被当成对准，左臂更往南扫进立柱。
+
+### 15.2 已验证、不要回退的行为
+
+- 抱持判定：`MIN_HOLD_HALF_SPAN_M=0.075`。曾经用 0.100 把已经夹住的箱子判失败。
+- 黄箱 Y：视觉常偏南；X/Z 对齐布局，Y 最多向 2.30 拉 2 cm。
+- 不要在柜里拆开双臂抱持去躲立柱。单臂收起（`l1_south_arm_tuck`）会掉箱，画面会像“抱歪了”。
+- 不要在仍夹着箱子时把掌心往身体抽（进柜前 4 cm 内收）。IK 目标到不了，`paired arms did not settle`，恢复半途发力会把物体碰掉。
+- 松手：左右各张开 4 cm，同时指尖回抽 4 cm。只张 2 cm 时掌距约 0.218 m，小于箱宽 0.24 m，倒车会把箱子拖出来。
+- 西向插入差约 4–6 cm 且箱已在接收半径内：当作放到了（外偏门槛 0.06 m，剩余 0.06 m），先下降再松手再倒车，不要抱着倒出来。
+- 视觉只在停稳后拍（桌面黄箱、货架包装）。底盘巡航加速不糊视觉；包装检测失败则用布局 `PACKAGING_WORLD`。
+
+### 15.3 当前底盘速度
+
+巡航用上限，靠近目标按剩余距离减速（`0.8 * remaining` / `0.7 * remaining`）：
+
+```text
+过道/站位    0.42 m/s    转向 1.10 rad/s
+离桌         0.36 m/s
+进柜         0.22 m/s    直线纠偏 0.95 rad/s
+松手后倒车   0.42 m/s
+```
+
+单任务预算按 3 分钟考虑（整局 600 s 要连续三项）。进柜比空地慢，避免再撞立柱。
+
+### 15.4 下一局怎么跑
+
+Task 3 独立校准已通过，黄箱在 L1。P5 需要开局布局（粉箱桌面、棕箱 L2、黄箱方块顶），所以先重启 Server，再按 Task 1→2→3 连续跑，中途不要重启。不要启动不带 `--preflight-only` 的 `formal_client.py`。
+
+单独再跑 Task 3 时用：
+
+```bash
+python3 task3_cube_top_shelf_place_check.py \
+  --apply \
+  --output /workspace/baseline/outputs/task3_cube_top_shelf_place_check.json
+```

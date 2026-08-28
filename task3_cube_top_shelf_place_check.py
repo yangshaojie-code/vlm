@@ -137,9 +137,11 @@ TASK3_PLACE_REMAINING_OK_M = 0.06
 TASK3_STANDOFF_M = 0.50
 TASK3_HOLD_HALF_M = 0.115
 TASK3_HOLD_SQUEEZE_RAD = 0.05
-TASK3_HOLD_LINEAR_SPEED = 0.20
-TASK3_SHELF_LINEAR_SPEED = 0.14
-TASK3_TABLE_LEAVE_LINEAR_SPEED = 0.18
+TASK3_HOLD_LINEAR_SPEED = 0.42
+TASK3_SHELF_LINEAR_SPEED = 0.22
+TASK3_TABLE_LEAVE_LINEAR_SPEED = 0.36
+TASK3_HOLD_ANGULAR_SPEED = 1.10
+TASK3_LINE_ANGULAR_SPEED = 0.95
 SHELF_AISLE_Y_M = 0.778
 APPROACH_STALL_X_M = -1.83
 PLACE_ALIGN_YAW_TOLERANCE_RAD = 0.05
@@ -769,6 +771,7 @@ def _drive_line_task3(
     position_tolerance: float = 0.02,
     min_traveled_m: float = 0.0,
     max_linear_speed: float = TASK3_SHELF_LINEAR_SPEED,
+    max_angular_speed: float = TASK3_LINE_ANGULAR_SPEED,
     key_prefix: str = "line",
     held_center_base=None,
     place_world=None,
@@ -815,6 +818,7 @@ def _drive_line_task3(
         linear, angular, details = held_line_command(
             current, start_pose, target_pose, direction, position_tolerance, 0.05,
             min_traveled_m=min_traveled_m, max_linear_speed=max_linear_speed,
+            max_angular_speed=max_angular_speed,
         )
         if held_center_base is not None and place_world is not None and place_radius is not None:
             inside = box_inside_place_radius(current, held_center_base, place_world, place_radius)
@@ -1496,7 +1500,7 @@ def main(argv=None) -> int:
             result["phase"] = phase
             _navigate(
                 node, station, 0.04, 0.03, args.nav_timeout, MAX_STATION_NAV_M,
-                TASK3_HOLD_LINEAR_SPEED, 0.60, result,
+                TASK3_HOLD_LINEAR_SPEED, TASK3_HOLD_ANGULAR_SPEED, result,
             )
             station_navigation = {
                 "final_base": result.get("final_base"),
@@ -1581,6 +1585,7 @@ def main(argv=None) -> int:
             context["hold_left"], context["hold_right"], args.gripper_open,
             yaw_tolerance=PLACE_ALIGN_YAW_TOLERANCE_RAD,
             key_prefix="face_west", hold_keeper=keeper,
+            max_angular_speed=TASK3_HOLD_ANGULAR_SPEED,
         )
 
         phase = "staging_nav"
@@ -1594,7 +1599,9 @@ def main(argv=None) -> int:
             node, stage_pose, args.nav_timeout, MAX_STAGING_NAV_M, result,
             context["hold_left"], context["hold_right"], args.gripper_open,
             position_tolerance=0.04, yaw_tolerance=PLACE_ALIGN_YAW_TOLERANCE_RAD,
-            max_linear_speed=TASK3_HOLD_LINEAR_SPEED, hold_keeper=keeper,
+            max_linear_speed=TASK3_HOLD_LINEAR_SPEED,
+            max_angular_speed=TASK3_HOLD_ANGULAR_SPEED,
+            hold_keeper=keeper,
         )
         result["staging_final_base"] = staging_final.tolist()
         result["staging_completed"] = True
@@ -1679,6 +1686,7 @@ def main(argv=None) -> int:
                 node, insert_plan["south_bearing"], args.yaw_timeout, result,
                 context["hold_left"], context["hold_right"], args.gripper_open,
                 yaw_tolerance=0.08, key_prefix="shelf_approach_face_south", hold_keeper=keeper,
+                max_angular_speed=TASK3_HOLD_ANGULAR_SPEED,
             )
             south_start = _odom_pose(node)
             south_pose = np.array([south_now[0], south_now[1], south_start[2]], dtype=float)
@@ -1699,6 +1707,7 @@ def main(argv=None) -> int:
             context["hold_left"], context["hold_right"], args.gripper_open,
             yaw_tolerance=PLACE_INSERT_YAW_TOLERANCE_RAD,
             key_prefix="shelf_approach_square_west", hold_keeper=keeper,
+            max_angular_speed=TASK3_HOLD_ANGULAR_SPEED,
         )
         west_start = _odom_pose(node)
         west_pose = np.array([place_stand_now[0], place_stand_now[1], insert_plan["west_yaw"]], dtype=float)

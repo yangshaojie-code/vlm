@@ -35,9 +35,11 @@ from task3_cube_top_shelf_place_check import (
     TASK3_GRASP_FWD_OFFSET_M,
     TASK3_GRASP_Z_OFFSET_M,
     TASK3_HOLD_HALF_M,
+    TASK3_HOLD_ANGULAR_SPEED,
     TASK3_HOLD_LINEAR_SPEED,
     TASK3_HOLD_SQUEEZE_RAD,
     TASK3_LIFT_HEIGHT_M,
+    TASK3_LINE_ANGULAR_SPEED,
     TASK3_RELEASE_OPEN_RAD,
     TASK3_RELEASE_SPREAD_M,
     TASK3_RELEASE_WITHDRAW_M,
@@ -286,9 +288,11 @@ class Task3CubeTopShelfPlaceCheckTests(unittest.TestCase):
         self.assertGreater(retract_at, retreat_at)
         self.assertIn("l1_release_joints", source)
         self.assertIn("recovery_released_on_shelf", inspect.getsource(_recover))
-        self.assertGreaterEqual(TASK3_HOLD_LINEAR_SPEED, 0.18)
-        self.assertGreaterEqual(TASK3_SHELF_LINEAR_SPEED, 0.12)
-        self.assertGreaterEqual(TASK3_TABLE_LEAVE_LINEAR_SPEED, 0.16)
+        self.assertGreaterEqual(TASK3_HOLD_LINEAR_SPEED, 0.38)
+        self.assertGreaterEqual(TASK3_SHELF_LINEAR_SPEED, 0.20)
+        self.assertGreaterEqual(TASK3_TABLE_LEAVE_LINEAR_SPEED, 0.32)
+        self.assertGreaterEqual(TASK3_HOLD_ANGULAR_SPEED, 1.00)
+        self.assertGreaterEqual(TASK3_LINE_ANGULAR_SPEED, 0.85)
 
     def test_yellow_hug_window_from_station(self):
         box_base = np.array([0.56, -0.01, 1.004])
@@ -342,7 +346,7 @@ class Task3CubeTopShelfPlaceCheckTests(unittest.TestCase):
         self.assertTrue(plan["needs_south_shift"])
         self.assertAlmostEqual(abs(plan["west_yaw"]), math.pi)
         self.assertAlmostEqual(plan["south_bearing"], -math.pi / 2, places=2)
-        self.assertGreater(TASK3_SHELF_LINEAR_SPEED, 0.12)
+        self.assertGreater(TASK3_SHELF_LINEAR_SPEED, 0.20)
         self.assertLess(PLACE_ALIGN_YAW_TOLERANCE_RAD, 0.08)
         self.assertLess(PLACE_INSERT_YAW_TOLERANCE_RAD, PLACE_ALIGN_YAW_TOLERANCE_RAD)
 
@@ -353,7 +357,9 @@ class Task3CubeTopShelfPlaceCheckTests(unittest.TestCase):
         self.assertIn("shelf_approach_west", source)
         self.assertIn("shelf_approach_square_west", source)
         self.assertIn("PLACE_INSERT_YAW_TOLERANCE_RAD", source)
+        self.assertIn("TASK3_HOLD_ANGULAR_SPEED", source)
         self.assertIn("l1_clear_bay_y", inspect.getsource(place_left_of_obstacle))
+        self.assertNotIn("l1_inward_hold_joints", source)
         self.assertNotIn("l1_pole_clear_hold_plan", source)
         self.assertNotIn("l1_south_arm_tuck", source)
         self.assertNotIn("shelf_approach_west_then_south", source)

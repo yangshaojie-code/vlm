@@ -486,6 +486,7 @@ def _face_yaw_holding(
     yaw_tolerance: float = STAGING_YAW_TOLERANCE_RAD,
     key_prefix: str = "face_yaw",
     hold_keeper=None,
+    max_angular_speed: float = MAX_HOLD_ANGULAR_SPEED,
 ):
     """Rotate in place to a heading while keeping the locked hug."""
     deadline = time.monotonic() + float(timeout)
@@ -520,7 +521,7 @@ def _face_yaw_holding(
             node.controller.stop_base()
             raise TimeoutError(f"{key_prefix} stalled; yaw error={yaw_error:.4f} rad")
         angular_magnitude = min(
-            MAX_HOLD_ANGULAR_SPEED,
+            float(max_angular_speed),
             max(MIN_HOLD_ANGULAR_SPEED, 1.8 * abs(yaw_error)),
         )
         node.controller.publish_velocity(0.0, math.copysign(angular_magnitude, yaw_error))
